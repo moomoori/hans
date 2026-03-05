@@ -35,6 +35,9 @@
         .item-info { font-size: 0.85rem; color: #666; margin-bottom: 12px; }
         .item-link { color: var(--deep-green); text-decoration: none; font-weight: bold; font-size: 0.9rem; border: 1px solid var(--deep-green); padding: 5px 10px; border-radius: 8px; }
 
+        /* 수동 입력창 스타일 */
+        .manual-input { width: 80%; padding: 10px; border-radius: 8px; border: none; margin-bottom: 10px; }
+
         @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
@@ -44,6 +47,12 @@
 <div class="container">
     <h1>🍱 오늘 뭐 먹지?</h1>
     <button id="startBtn" class="start-btn" onclick="startLocation()">📍 내 주변 맛집 찾기</button>
+
+    <div id="manualStep" class="step-box">
+        <h3>위치를 찾을 수 없어요 😢<br>동네 이름을 입력해 주세요.</h3>
+        <input type="text" id="manualAddr" class="manual-input" placeholder="예: 역삼동, 한남동">
+        <button class="opt-btn" style="width:100%; background:var(--deep-green);" onclick="setManualAddr()">확인</button>
+    </div>
 
     <div id="step1" class="step-box">
         <h3>어떤 종류가 당기시나요?</h3>
@@ -72,14 +81,15 @@
 let currentAddr = "서울 강남역"; 
 let currentFood = "";
 
-// 단계별 화면 전환 제어 함수
-function showStep(stepNum) {
+function showStep(stepId) {
+    // 모든 박스 숨기기
     document.getElementById('startBtn').style.display = 'none';
+    document.getElementById('manualStep').style.display = 'none';
     document.getElementById('step1').style.display = 'none';
     document.getElementById('step2').style.display = 'none';
     
-    if (stepNum === 1) document.getElementById('step1').style.display = 'block';
-    if (stepNum === 2) document.getElementById('step2').style.display = 'block';
+    // 타겟만 보이기
+    if(stepId) document.getElementById(stepId).style.display = 'block';
 }
 
 function startLocation() {
@@ -87,64 +97,55 @@ function startLocation() {
     btn.innerText = "📍 위치 파악 중...";
     btn.disabled = true;
 
-    // 타임아웃 시 강제 진행을 위한 안전장치
-    const backupTimer = setTimeout(() => {
-        if (btn.disabled) {
-            console.log("위치 파악 지연으로 기본 위치 사용");
-            showStep(1);
-        }
-    }, 8000);
-
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(pos => {
-            clearTimeout(backupTimer); // 성공 시 백업 타이머 해제
-            const lat = pos.coords.latitude;
-            const lng = pos.coords.longitude;
-            
-            if (typeof naver !== 'undefined' && naver.maps.Service) {
-                naver.maps.Service.reverseGeocode({
-                    coords: new naver.maps.LatLng(lat, lng)
-                }, (status, res) => {
-                    if (status === naver.maps.Service.Status.OK && res.v2 && res.v2.address) {
-                        currentAddr = res.v2.address.jibunAddress || res.v2.address.roadAddress;
-                        console.log("주소 획득 완료:", currentAddr);
-                    }
-                    showStep(1);
-                });
-            } else {
-                showStep(1);
-            }
-        }, (error) => {
-            clearTimeout(backupTimer);
-            console.warn("GPS 획득 실패:", error.message);
-            // 에러가 나도 '강남역' 기본값으로라도 진행하게 함
-            showStep(1);
-        }, { 
-            enableHighAccuracy: false, // 정확도를 낮추면 훨씬 빨리 잡힙니다
-            timeout: 10000,            // 시간을 10초로 연장
-            maximumAge: 60000          // 1분 이내에 잡았던 기록이 있으면 재사용
-        });
-    } else {
-        showStep(1);
+    if (!navigator.geolocation) {
+        showStep('manualStep');
+        return;
     }
+
+    navigator.geolocation.getCurrentPosition(pos => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        
+        if (typeof naver !== 'undefined' && naver.maps.Service) {
+            naver.maps.Service.reverseGeocode({
+                coords: new naver.maps.LatLng(lat, lng)
+            }, (status, res) => {
+                if (status === naver.maps.Service.Status.OK && res.v2 && res.v2.address) {
+                    currentAddr = res.v2.address.jibunAddress || res.v2.address.roadAddress;
+                }
+                showStep('step1');
+            });
+        } else {
+            showStep('step1');
+        }
+    }, (error) => {
+        console.warn("GPS 실패:", error.message);
+        showStep('manualStep'); // 실패 시 수동 입력창으로 전환
+    }, { enableHighAccuracy: false, timeout: 5000 });
+}
+
+function setManualAddr() {
+    const val = document.getElementById('manualAddr').value;
+    if(val.trim() !== "") currentAddr = val;
+    showStep('step1');
 }
 
 function selectFood(food) {
     currentFood = food;
-    showStep(2); // STEP 1 숨기고 STEP 2 열기
+    showStep('step2');
 }
 
 function fetchFinal(minutes) {
-    showStep(0); // 모든 버튼 숨기기
+    showStep(null); 
     const resArea = document.getElementById('resultArea');
     resArea.innerHTML = "<p style='color:#666;'>✨ 최적의 맛집을 찾는 중...</p>";
 
-    fetch(`/recommend_v2?location=${currentAddr}&food=${currentFood}`)
+    fetch(`/recommend_v2?location=${encodeURIComponent(currentAddr)}&food=${encodeURIComponent(currentFood)}`)
         .then(res => res.json())
         .then(data => {
             resArea.innerHTML = `<h2 style='text-align:left; font-size:1.1rem; color:#888;'>📍 ${currentAddr} 추천</h2>`;
             if (!data.items || data.items.length === 0) {
-                resArea.innerHTML += "<p>맛집 정보를 찾지 못했습니다.</p>";
+                resArea.innerHTML += "<p>근처에 맛집이 없습니다. 동네 이름을 정확히 입력해 보세요!</p>";
                 resArea.innerHTML += `<button onclick="location.reload()" class="opt-btn" style="width:100%;">다시 시도</button>`;
                 return;
             }
@@ -160,8 +161,7 @@ function fetchFinal(minutes) {
             });
             resArea.innerHTML += `<button onclick="location.reload()" class="opt-btn" style="width:100%; margin-top:20px; background:#444;">처음부터 다시하기</button>`;
         }).catch(() => {
-            resArea.innerHTML = "<p>오류가 발생했습니다.</p>";
-            resArea.innerHTML += `<button onclick="location.reload()" class="opt-btn" style="width:100%;">새로고침</button>`;
+            resArea.innerHTML = "<p>서버 연결에 실패했습니다.</p>";
         });
 }
 </script>
