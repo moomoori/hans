@@ -26,14 +26,15 @@ def index():
 
 @app.route('/recommend')
 def recommend():
-    # 실제로는 위치 정보를 브라우저에서 받아올 수 있지만, 우선 강남역 기준으로 테스트
     restaurant = get_random_restaurant()
     if restaurant:
+        # 네이버는 제목에 <b> 태그가 포함되므로 제거
+        clean_name = restaurant['title'].replace('<b>', '').replace('</b>', '')
         return jsonify({
-            "name": restaurant['place_name'],
-            "category": restaurant['category_name'].split(' > ')[-1],
-            "address": restaurant['address_name'],
-            "url": restaurant['place_url']
+            "name": clean_name,
+            "category": restaurant['category'],
+            "address": restaurant['address'],
+            "link": restaurant['link']
         })
     return jsonify({"error": "맛집을 찾을 수 없습니다."}), 404
 
