@@ -1,0 +1,6 @@
+.vscode-server/
+.local/
+venv/
+*.log
+__pycache__/
+.env

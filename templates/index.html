@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>오늘 뭐 먹지?</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding-top: 50px; background-color: #f4f4f4; }
+        .container { background: white; display: inline-block; padding: 40px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        button { padding: 15px 30px; font-size: 18px; cursor: pointer; background: #fee500; border: none; border-radius: 8px; font-weight: bold; }
+        #result { margin-top: 20px; padding: 20px; display: none; border-top: 1px solid #eee; }
+        a { color: #ff5252; text-decoration: none; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🍴 저녁 메뉴 추천기</h1>
+        <p>결정하기 힘들 땐 버튼을 누르세요!</p>
+        <button onclick="getMenu()">오늘 뭐 먹지?</button>
+
+        <div id="result">
+            <h2 id="store-name"></h2>
+            <p id="store-cat" style="color: #666;"></p>
+            <p id="store-addr"></p>
+            <a id="store-link" target="_blank">👉 카카오맵에서 상세 정보 보기</a>
+        </div>
+    </div>
+
+    <script>
+        async function getMenu() {
+            const btn = document.querySelector('button');
+            btn.innerText = "고르는 중...";
+            
+            try {
+                const res = await fetch('/recommend');
+                const data = await res.json();
+                
+                if (data.name) {
+                    document.getElementById('result').style.display = 'block';
+                    document.getElementById('store-name').innerText = data.name;
+                    document.getElementById('store-cat').innerText = data.category;
+                    document.getElementById('store-addr').innerText = data.address;
+                    document.getElementById('store-link').href = data.url;
+                } else {
+                    alert("맛집을 찾지 못했어요. API 설정을 확인해주세요!");
+                }
+            } catch (e) {
+                alert("서버와 통신 중 에러가 발생했습니다.");
+            } finally {
+                btn.innerText = "다시 고르기!";
+            }
+        }
+    </script>
+</body>
+</html>
