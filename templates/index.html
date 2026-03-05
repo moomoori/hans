@@ -1,54 +1,116 @@
 <!DOCTYPE html>
-<html>
+<html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>오늘 뭐 먹지?</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>오늘 뭐 먹지? 🍱</title>
+    <script type="text/javascript" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId={{ client_id }}&submodules=geocoder"></script>
     <style>
-        body { font-family: sans-serif; text-align: center; padding-top: 50px; background-color: #f4f4f4; }
-        .container { background: white; display: inline-block; padding: 40px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        button { padding: 15px 30px; font-size: 18px; cursor: pointer; background: #fee500; border: none; border-radius: 8px; font-weight: bold; }
-        #result { margin-top: 20px; padding: 20px; display: none; border-top: 1px solid #eee; }
-        a { color: #ff5252; text-decoration: none; font-weight: bold; }
+        :root { --naver-green: #03C75A; }
+        body { font-family: 'Pretendard', sans-serif; background-color: #f8f9fa; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 500px; margin: 0 auto; text-align: center; }
+        
+        h1 { margin-bottom: 30px; font-size: 2rem; }
+        
+        .search-box { display: flex; gap: 10px; margin-bottom: 25px; }
+        input { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 8px; outline: none; }
+        input:focus { border-color: var(--naver-green); }
+        button { background: var(--naver-green); color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+
+        /* 세련된 맛집 카드 UI */
+        .card { 
+            display: none; background: white; border-radius: 20px; overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08); text-align: left;
+            animation: slideUp 0.5s ease-out;
+        }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        .card-content { padding: 20px; }
+        .badge { background: #e8f5e9; color: var(--naver-green); font-size: 0.8rem; padding: 4px 10px; border-radius: 20px; font-weight: bold; }
+        .title { font-size: 1.6rem; font-weight: 800; margin: 10px 0; }
+        .info { font-size: 0.95rem; color: #666; margin-bottom: 8px; display: flex; align-items: center; gap: 5px; }
+        .rating { color: #ffcc00; font-size: 1.1rem; margin: 10px 0; }
+
+        #map { width: 100%; height: 250px; background: #eee; }
+        .btn-link { display: block; text-align: center; padding: 15px; background: #f1f3f5; color: #333; text-decoration: none; font-weight: bold; margin-top: 10px; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🍴 저녁 메뉴 추천기</h1>
-        <p>결정하기 힘들 땐 버튼을 누르세요!</p>
-        <button onclick="getMenu()">오늘 뭐 먹지?</button>
 
-        <div id="result">
-            <h2 id="store-name"></h2>
-            <p id="store-cat" style="color: #666;"></p>
-            <p id="store-addr"></p>
-            <a id="store-link" target="_blank">👉 카카오맵에서 상세 정보 보기</a>
-        </div>
+<div class="container">
+    <h1>🍱 오늘 뭐 먹지?</h1>
+    
+    <div class="search-box">
+        <input type="text" id="query" placeholder="지역이나 맛집을 입력하세요">
+        <button onclick="startSearch()">추천!</button>
     </div>
 
-    <script>
-        async function getMenu() {
-            const btn = document.querySelector('button');
-            btn.innerText = "고르는 중...";
-            
-            try {
-                const res = await fetch('/recommend');
-                const data = await res.json();
-                
-                if (data.name) {
-                    document.getElementById('result').style.display = 'block';
-                    document.getElementById('store-name').innerText = data.name;
-                    document.getElementById('store-cat').innerText = data.category;
-                    document.getElementById('store-addr').innerText = data.address;
-                    document.getElementById('store-link').href = data.url;
-                } else {
-                    alert("맛집을 찾지 못했어요. API 설정을 확인해주세요!");
-                }
-            } catch (e) {
-                alert("서버와 통신 중 에러가 발생했습니다.");
-            } finally {
-                btn.innerText = "다시 고르기!";
-            }
+    <div id="resultCard" class="card">
+        <div id="map"></div>
+        <div class="card-content">
+            <span id="category" class="badge">카테고리</span>
+            <div id="placeName" class="title">맛집 이름</div>
+            <div class="rating">★★★★★ <span style="color:#888; font-size:0.9rem;">(방문자리뷰 100+)</span></div>
+            <div id="address" class="info">📍 주소 정보를 불러오는 중...</div>
+            <a id="naverLink" href="#" target="_blank" class="btn-link">네이버 플레이스에서 보기</a>
+        </div>
+    </div>
+</div>
+
+<script>
+let map = null;
+let marker = null;
+
+function startSearch() {
+    const userInput = document.getElementById('query').value;
+    
+    if (userInput) {
+        fetchRecommend(userInput);
+    } else {
+        // 입력값 없으면 현재 위치 시도
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(pos => {
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+                // 좌표를 주소로 변환(Reverse Geocode)
+                naver.maps.Service.reverseGeocode({ coords: new naver.maps.LatLng(lat, lng) }, (status, res) => {
+                    const addr = res.v2.address.jibunAddress || "강남역";
+                    fetchRecommend(addr + " 맛집");
+                });
+            }, () => fetchRecommend("강남역 맛집"));
+        } else {
+            fetchRecommend("강남역 맛집");
         }
-    </script>
+    }
+}
+
+function fetchRecommend(query) {
+    fetch(`/recommend?query=${query}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) return alert(data.error);
+
+            // 카드 노출 및 데이터 매핑
+            document.getElementById('resultCard').style.display = 'block';
+            document.getElementById('placeName').innerText = data.name;
+            document.getElementById('category').innerText = data.category;
+            document.getElementById('address').innerText = `📍 ${data.address}`;
+            document.getElementById('naverLink').href = data.link || `https://search.naver.com/search.naver?query=${data.name}`;
+
+            // 지도 표시 (TM128 좌표 변환)
+            const point = new naver.maps.Point(data.mapx, data.mapy);
+            const latlng = naver.maps.TransCoord.fromTM128ToLatLng(point);
+
+            if (!map) {
+                map = new naver.maps.Map('map', { center: latlng, zoom: 16 });
+                marker = new naver.maps.Marker({ position: latlng, map: map });
+            } else {
+                map.setCenter(latlng);
+                marker.setPosition(latlng);
+            }
+        });
+}
+</script>
+
 </body>
 </html>
