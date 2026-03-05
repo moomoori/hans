@@ -87,25 +87,27 @@ function startLocation() {
     btn.innerText = "📍 위치 파악 중...";
     btn.disabled = true;
 
+    // 타임아웃 시 강제 진행을 위한 안전장치
+    const backupTimer = setTimeout(() => {
+        if (btn.disabled) {
+            console.log("위치 파악 지연으로 기본 위치 사용");
+            showStep(1);
+        }
+    }, 8000);
+
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(pos => {
+            clearTimeout(backupTimer); // 성공 시 백업 타이머 해제
             const lat = pos.coords.latitude;
             const lng = pos.coords.longitude;
             
-            // 좌표를 찍어보기 위한 로그 (F12 콘솔에서 확인 가능)
-            console.log("좌표 획득:", lat, lng);
-
             if (typeof naver !== 'undefined' && naver.maps.Service) {
                 naver.maps.Service.reverseGeocode({
                     coords: new naver.maps.LatLng(lat, lng)
                 }, (status, res) => {
-                    // 주소 변환 성공 시
                     if (status === naver.maps.Service.Status.OK && res.v2 && res.v2.address) {
                         currentAddr = res.v2.address.jibunAddress || res.v2.address.roadAddress;
-                        console.log("실제 주소 획득:", currentAddr);
-                    } else {
-                        console.error("주소 변환 실패. 서비스 권한을 확인하세요.");
-                        // 주소 변환 실패 시 '강남역' 대신 대략적인 좌표 이름이라도 설정 (선택 사항)
+                        console.log("주소 획득 완료:", currentAddr);
                     }
                     showStep(1);
                 });
@@ -113,9 +115,15 @@ function startLocation() {
                 showStep(1);
             }
         }, (error) => {
-            console.error("GPS 획득 실패:", error);
+            clearTimeout(backupTimer);
+            console.warn("GPS 획득 실패:", error.message);
+            // 에러가 나도 '강남역' 기본값으로라도 진행하게 함
             showStep(1);
-        }, { enableHighAccuracy: true, timeout: 5000 });
+        }, { 
+            enableHighAccuracy: false, // 정확도를 낮추면 훨씬 빨리 잡힙니다
+            timeout: 10000,            // 시간을 10초로 연장
+            maximumAge: 60000          // 1분 이내에 잡았던 기록이 있으면 재사용
+        });
     } else {
         showStep(1);
     }
