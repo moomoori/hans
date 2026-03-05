@@ -107,11 +107,16 @@ function startLocation() {
         const lng = pos.coords.longitude;
         
         if (typeof naver !== 'undefined' && naver.maps.Service) {
-            naver.maps.Service.reverseGeocode({
+           naver.maps.Service.reverseGeocode({
                 coords: new naver.maps.LatLng(lat, lng)
             }, (status, res) => {
                 if (status === naver.maps.Service.Status.OK && res.v2 && res.v2.address) {
                     currentAddr = res.v2.address.jibunAddress || res.v2.address.roadAddress;
+                    console.log("주소 획득 성공:", currentAddr);
+                } else {
+                    // [이 부분 추가] 에러가 나면 알림창을 띄워 원인 파악
+                    alert("네이버 API 주소 변환 실패! NCP 콘솔에서 'Reverse Geocoding' 권한과 'Web 서비스 URL' 등록을 확인하세요.");
+                    console.error("Geocode Error Status:", status);
                 }
                 showStep('step1');
             });
