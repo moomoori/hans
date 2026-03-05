@@ -28,16 +28,16 @@
         .result-item { 
             background: #ffffff; color: #111; border-radius: 18px; padding: 20px; 
             margin-bottom: 15px; text-align: left; transition: transform 0.2s;
-            cursor: pointer; position: relative;
+            cursor: pointer; position: relative; border-left: 6px solid var(--main-green);
         }
-        .result-item:active { transform: scale(0.98); }
+        .result-item:active { transform: scale(0.97); }
         .item-category { font-size: 0.75rem; color: var(--main-green); font-weight: bold; margin-bottom: 4px; }
-        .item-name { font-weight: 800; font-size: 1.2rem; margin-bottom: 6px; }
-        .item-info { font-size: 0.85rem; color: #555; }
-        .go-map { position: absolute; right: 20px; bottom: 20px; font-size: 0.8rem; color: #888; }
+        .item-name { font-weight: 800; font-size: 1.25rem; margin-bottom: 6px; color: #000; }
+        .item-info { font-size: 0.85rem; color: #444; line-height: 1.4; }
+        .go-map { margin-top: 10px; font-size: 0.8rem; color: #888; font-weight: bold; text-align: right; }
 
-        #moreBtn { background: #333; width: 100%; padding: 15px; margin-top: 10px; border: none; border-radius: 12px; color: white; cursor: pointer; }
-        .reset-btn { background: transparent; color: #666; border: none; margin-top: 30px; text-decoration: underline; cursor: pointer; }
+        #moreBtn { background: #333; width: 100%; padding: 18px; margin-top: 10px; border: none; border-radius: 12px; color: white; cursor: pointer; font-weight: bold; }
+        .reset-btn { background: transparent; color: #888; border: none; margin-top: 30px; text-decoration: underline; cursor: pointer; padding-bottom: 50px; }
     </style>
 </head>
 <body>
@@ -48,7 +48,7 @@
     <div id="step0" class="step-box">
         <h3>📍 어디서 드시나요?<br><span style="font-size:0.8rem; font-weight:normal;">동네 이름을 입력해 주세요 (예: 역삼동)</span></h3>
         <input type="text" id="userLocation" class="manual-input" placeholder="동네나 역 이름 입력">
-        <button class="opt-btn" style="width:100%; background:var(--main-green);" onclick="goToFood()">맛집 찾기</button>
+        <button class="opt-btn" style="width:100%; background:var(--main-green);" onclick="goToFood()">음식 고르기</button>
     </div>
 
     <div id="step1" class="step-box" style="display:none;">
@@ -62,7 +62,7 @@
     </div>
 
     <div id="resultArea" style="margin-top: 30px;"></div>
-    <div id="buttonArea" style="margin-bottom: 50px;"></div>
+    <div id="buttonArea"></div>
 </div>
 
 <script>
@@ -79,7 +79,7 @@ function goToFood() {
     selectedLocation = loc;
     document.getElementById('step0').style.display = 'none';
     document.getElementById('step1').style.display = 'block';
-    document.getElementById('locationTitle').innerText = `📍 ${selectedLocation}\n어떤 음식이 당기시나요?`;
+    document.getElementById('locationTitle').innerText = `📍 ${selectedLocation}\n어떤 종류가 당기시나요?`;
 }
 
 function fetchResults(food, isMore = false) {
@@ -87,8 +87,10 @@ function fetchResults(food, isMore = false) {
         startOffset = 1;
         currentCategory = food;
         document.getElementById('step1').style.display = 'none';
-        document.getElementById('resultArea').innerHTML = "<p style='color:#666;'>✨ 리뷰 많은 맛집을 엄선 중...</p>";
+        document.getElementById('resultArea').innerHTML = "<p style='color:#888;'>✨ 평점 높은 맛집을 찾는 중...</p>";
         document.getElementById('buttonArea').innerHTML = "";
+    } else {
+        document.getElementById('moreBtn').innerText = "⏳ 불러오는 중...";
     }
 
     fetch(`/recommend_v2?location=${selectedLocation}&food=${food}&start=${startOffset}`)
@@ -98,14 +100,19 @@ function fetchResults(food, isMore = false) {
             const btnArea = document.getElementById('buttonArea');
             
             if (!isMore) {
-                resArea.innerHTML = `<h2 style='text-align:left; font-size:1.2rem; margin-bottom:20px;'>🔥 ${selectedLocation} ${food} 베스트</h2>`;
+                resArea.innerHTML = `<h2 style='text-align:left; font-size:1.3rem; margin-bottom:20px; color:#fff;'>🔥 ${selectedLocation} ${food} 베스트</h2>`;
             }
 
             if (!data.items || data.items.length === 0) {
                 if (!isMore) resArea.innerHTML = "<p>검색 결과가 없습니다.</p>";
-                else alert("더 이상 결과가 없습니다.");
+                else alert("마지막 결과입니다.");
+                if(document.getElementById('moreBtn')) document.getElementById('moreBtn').style.display = 'none';
                 return;
             }
+
+            // 기존 더보기 버튼 제거
+            const oldBtn = document.getElementById('moreBtn');
+            if(oldBtn) oldBtn.remove();
 
             data.items.forEach(item => {
                 resArea.innerHTML += `
@@ -113,19 +120,25 @@ function fetchResults(food, isMore = false) {
                         <div class="item-category">${item.category}</div>
                         <div class="item-name">${item.name}</div>
                         <div class="item-info">📍 ${item.address}</div>
-                        <div class="go-map">지도보기 ➔</div>
+                        <div class="go-map">네이버 지도로 보기 ➔</div>
                     </div>
                 `;
             });
 
-            // 더보기 버튼 제어
             startOffset += 10;
-            let btns = "";
-            if (startOffset <= 90) { // 네이버 API 최대 100개 제한
-                btns += `<button id="moreBtn" onclick="fetchResults('${food}', true)">맛집 10개 더보기 (+)</button>`;
+            if (startOffset <= 90) {
+                btnArea.innerHTML = `
+                    <button id="moreBtn" onclick="fetchResults('${food}', true)">맛집 10개 더보기 (+)</button>
+                    <button class="reset-btn" onclick="location.reload()">처음으로 돌아가기</button>
+                `;
+            } else {
+                btnArea.innerHTML = `<button class="reset-btn" onclick="location.reload()">처음으로 돌아가기</button>`;
             }
-            btns += `<button class="reset-btn" onclick="location.reload()">처음으로 돌아가기</button>`;
-            btnArea.innerHTML = btns;
+            
+            // 더보기 시 스크롤 약간 이동
+            if(isMore) {
+                window.scrollBy({ top: 300, behavior: 'smooth' });
+            }
         });
 }
 </script>
