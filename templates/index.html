@@ -6,69 +6,42 @@
     <title>오늘 뭐 먹지? 🍱</title>
     <script type="text/javascript" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId={{ client_id }}&submodules=geocoder"></script>
     <style>
-        /* 짙은 녹색과 검정 테마 설정 */
-        :root {
-            --deep-green: #064e3b; /* 짙은 녹색 */
-            --dark-black: #111827; /* 세련된 검정 */
-            --soft-gray: #f3f4f6;
-        }
-
-        body { 
-            font-family: 'Pretendard', -apple-system, sans-serif; 
-            background-color: var(--dark-black); 
-            margin: 0; padding: 20px; color: white;
-            display: flex; justify-content: center;
-        }
-
-        .container { width: 100%; max-width: 450px; text-align: center; }
+        :root { --deep-green: #064e3b; --dark-black: #0a0a0a; --accent-green: #10b981; }
+        body { font-family: 'Pretendard', sans-serif; background-color: var(--dark-black); color: white; margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .container { width: 100%; max-width: 400px; text-align: center; }
         
-        h1 { margin-bottom: 30px; font-size: 1.8rem; font-weight: 700; color: #fff; }
-        
-        /* 검색창 디자인 */
-        .search-box { display: flex; gap: 10px; margin-bottom: 30px; }
-        input { 
-            flex: 1; padding: 14px; border: none; border-radius: 12px; 
-            background: #1f2937; color: white; outline: none; font-size: 1rem;
-        }
-        input:focus { box-shadow: 0 0 0 2px var(--deep-green); }
-        
-        button { 
-            background: var(--deep-green); color: white; border: none; 
-            padding: 14px 24px; border-radius: 12px; cursor: pointer; 
-            font-weight: bold; transition: all 0.3s ease;
-        }
-        button:hover { background: #065f46; transform: scale(1.05); }
+        h1 { font-size: 1.8rem; margin: 40px 0; font-weight: 800; letter-spacing: -1px; }
 
-        /* 맛집 카드 디자인 및 부드러운 애니메이션 */
-        .card { 
-            display: none; background: #ffffff; border-radius: 24px; overflow: hidden;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.4); text-align: left; color: #111;
-            animation: fadeInSlide 0.7s cubic-bezier(0.19, 1, 0.22, 1);
+        /* 메인 시작 버튼 */
+        .start-btn { 
+            width: 100%; padding: 20px; font-size: 1.2rem; font-weight: bold;
+            background: var(--deep-green); color: white; border: none; border-radius: 16px;
+            cursor: pointer; transition: 0.3s; box-shadow: 0 10px 20px rgba(0,0,0,0.3);
         }
+        .start-btn:active { transform: scale(0.95); }
 
-        @keyframes fadeInSlide {
-            from { opacity: 0; transform: translateY(30px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .card-content { padding: 24px; }
-        .badge { 
-            display: inline-block; background: #ecfdf5; color: var(--deep-green); 
-            font-size: 0.75rem; padding: 4px 12px; border-radius: 99px; font-weight: 700; 
-        }
-        .title { font-size: 1.7rem; font-weight: 800; margin: 12px 0 8px 0; color: var(--dark-black); }
+        /* 단계별 박스 */
+        .step-box { display: none; background: #171717; padding: 25px; border-radius: 24px; margin-top: 20px; animation: slideUp 0.4s ease-out; }
+        h3 { margin-top: 0; font-size: 1.1rem; color: #a3a3a3; }
         
-        .info { font-size: 0.95rem; color: #4b5563; margin-bottom: 12px; line-height: 1.5; }
-        .rating { color: #fbbf24; font-size: 1.1rem; margin-bottom: 15px; }
-
-        #map { width: 100%; height: 230px; background: #e5e7eb; }
-        
-        .btn-link { 
-            display: block; text-align: center; padding: 16px; 
-            background: var(--dark-black); color: white; text-decoration: none; 
-            font-weight: bold; border-radius: 12px; margin-top: 15px; transition: background 0.3s;
+        .option-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px; }
+        .opt-btn { 
+            background: #262626; color: white; border: none; padding: 16px; 
+            border-radius: 12px; cursor: pointer; font-size: 1rem; transition: 0.2s;
         }
-        .btn-link:hover { background: #374151; }
+        .opt-btn:hover { background: var(--deep-green); }
+
+        /* 결과 카드 */
+        .result-item { 
+            background: white; color: #111; border-radius: 16px; padding: 18px; 
+            margin-bottom: 12px; text-align: left; animation: fadeIn 0.5s ease;
+        }
+        .item-name { font-weight: 800; font-size: 1.1rem; margin-bottom: 4px; }
+        .item-info { font-size: 0.85rem; color: #666; margin-bottom: 10px; }
+        .item-link { color: var(--deep-green); text-decoration: none; font-weight: bold; font-size: 0.85rem; }
+
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
 </head>
 <body>
@@ -76,83 +49,82 @@
 <div class="container">
     <h1>🍱 오늘 뭐 먹지?</h1>
     
-    <div class="search-box">
-        <input type="text" id="query" placeholder="어디서 드실 건가요?">
-        <button onclick="startSearch()">추천받기</button>
-    </div>
+    <button id="startBtn" class="start-btn" onclick="startLocation()">📍 내 주변 맛집 찾기</button>
 
-    <div id="resultCard" class="card">
-        <div id="map"></div>
-        <div class="card-content">
-            <span id="category" class="badge">카테고리</span>
-            <div id="placeName" class="title">맛집 이름</div>
-            <div class="rating">★★★★★ <span style="color:#9ca3af; font-size:0.85rem; font-weight:400;">(방문자리뷰 100+)</span></div>
-            <div id="address" class="info">📍 주소를 불러오는 중...</div>
-            <a id="naverLink" href="#" target="_blank" class="btn-link">네이버 상세 정보 ➔</a>
+    <div id="step1" class="step-box">
+        <h3>어떤 종류가 당기시나요?</h3>
+        <div class="option-grid">
+            <button class="opt-btn" onclick="selectFood('한식')">한식 🍚</button>
+            <button class="opt-btn" onclick="selectFood('중식')">중식 🥢</button>
+            <button class="opt-btn" onclick="selectFood('일식')">일식 🍣</button>
+            <button class="opt-btn" onclick="selectFood('양식')">양식 🍝</button>
         </div>
     </div>
+
+    <div id="step2" class="step-box">
+        <h3>얼마나 걸어가실 건가요?</h3>
+        <div class="option-grid">
+            <button class="opt-btn" onclick="fetchFinal(5)">🚶 5분 거리</button>
+            <button class="opt-btn" onclick="fetchFinal(10)">🚶 10분 거리</button>
+            <button class="opt-btn" onclick="fetchFinal(15)">🏃 15분 거리</button>
+            <button class="opt-btn" onclick="fetchFinal(20)">🏃 20분 거리</button>
+        </div>
+    </div>
+
+    <div id="resultArea" style="margin-top: 30px;"></div>
 </div>
 
 <script>
-let map = null;
-let marker = null;
+let currentAddr = "";
+let currentFood = "";
 
-function startSearch() {
-    const userInput = document.getElementById('query').value;
-    const btn = document.querySelector('button');
-    btn.innerText = "찾는 중...";
-    btn.disabled = true;
+function startLocation() {
+    const btn = document.getElementById('startBtn');
+    btn.innerText = "📍 위치 파악 중...";
     
-    if (userInput) {
-        fetchRecommend(userInput);
-    } else {
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(pos => {
-                const lat = pos.coords.latitude;
-                const lng = pos.coords.longitude;
-                naver.maps.Service.reverseGeocode({ coords: new naver.maps.LatLng(lat, lng) }, (status, res) => {
-                    const addr = (res.v2 && res.v2.address.jibunAddress) ? res.v2.address.jibunAddress : "강남역";
-                    fetchRecommend(addr + " 맛집");
-                });
-            }, () => fetchRecommend("강남역 맛집"));
-        } else {
-            fetchRecommend("강남역 맛집");
-        }
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(pos => {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            
+            naver.maps.Service.reverseGeocode({
+                coords: new naver.maps.LatLng(lat, lng)
+            }, (status, res) => {
+                currentAddr = res.v2.address.jibunAddress || "내 주변";
+                btn.style.display = 'none';
+                document.getElementById('step1').style.display = 'block';
+            });
+        }, () => alert("위치 권한을 허용해주세요!"));
     }
 }
 
-function fetchRecommend(query) {
-    fetch(`/recommend?query=${query}`)
+function selectFood(food) {
+    currentFood = food;
+    document.getElementById('step1').style.display = 'none';
+    document.getElementById('step2').style.display = 'block';
+}
+
+function fetchFinal(minutes) {
+    document.getElementById('step2').style.display = 'none';
+    const resArea = document.getElementById('resultArea');
+    resArea.innerHTML = "<p style='color:#a3a3a3;'>가장 맛있는 곳을 고르는 중...</p>";
+
+    fetch(`/recommend_v2?location=${currentAddr}&food=${currentFood}`)
         .then(res => res.json())
         .then(data => {
-            const btn = document.querySelector('button');
-            btn.innerText = "추천받기";
-            btn.disabled = false;
-
-            if (data.error) return alert(data.error);
-
-            // 카드 보이기 및 애니메이션 초기화
-            const card = document.getElementById('resultCard');
-            card.style.display = 'block';
-            
-            document.getElementById('placeName').innerText = data.name;
-            document.getElementById('category').innerText = data.category;
-            document.getElementById('address').innerText = `📍 ${data.address}`;
-            document.getElementById('naverLink').href = data.link || `https://search.naver.com/search.naver?query=${data.name}`;
-
-            const point = new naver.maps.Point(data.mapx, data.mapy);
-            const latlng = naver.maps.TransCoord.fromTM128ToLatLng(point);
-
-            if (!map) {
-                map = new naver.maps.Map('map', { center: latlng, zoom: 16 });
-                marker = new naver.maps.Marker({ position: latlng, map: map });
-            } else {
-                map.setCenter(latlng);
-                marker.setPosition(latlng);
-            }
+            resArea.innerHTML = `<h2 style='text-align:left; font-size:1.2rem;'>✨ 추천 ${currentFood} TOP 5</h2>`;
+            data.items.forEach(item => {
+                resArea.innerHTML += `
+                    <div class="result-item">
+                        <div style="font-size:0.7rem; color:var(--deep-green); font-weight:bold; margin-bottom:5px;">${item.category}</div>
+                        <div class="item-name">${item.name}</div>
+                        <div class="item-info">📍 ${item.address} (도보 약 ${minutes}분)</div>
+                        <a href="${item.link || '#'}" target="_blank" class="item-link">네이버 플레이스 ➔</a>
+                    </div>
+                `;
+            });
         });
 }
 </script>
-
 </body>
 </html>
