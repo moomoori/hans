@@ -9,7 +9,6 @@
         :root { --deep-green: #064e3b; --dark-black: #0a0a0a; }
         body { font-family: 'Pretendard', sans-serif; background-color: var(--dark-black); color: white; margin: 0; padding: 20px; display: flex; justify-content: center; }
         .container { width: 100%; max-width: 400px; text-align: center; }
-        
         h1 { font-size: 1.8rem; margin: 50px 0; font-weight: 800; }
 
         .start-btn { 
@@ -17,7 +16,6 @@
             background: var(--deep-green); color: white; border: none; border-radius: 16px;
             cursor: pointer; transition: 0.3s; box-shadow: 0 10px 20px rgba(0,0,0,0.3);
         }
-        .start-btn:disabled { background: #333; cursor: not-allowed; }
 
         .step-box { display: none; background: #171717; padding: 25px; border-radius: 24px; margin-top: 20px; animation: slideUp 0.4s ease-out; }
         h3 { margin-top: 0; font-size: 1.1rem; color: #a3a3a3; margin-bottom: 20px; }
@@ -71,19 +69,25 @@
 </div>
 
 <script>
-let currentAddr = "서울 강남역"; // 위치 실패 시 기본값
+let currentAddr = "서울 강남역"; 
 let currentFood = "";
+
+// 단계별 화면 전환 제어 함수
+function showStep(stepNum) {
+    document.getElementById('startBtn').style.display = 'none';
+    document.getElementById('step1').style.display = 'none';
+    document.getElementById('step2').style.display = 'none';
+    
+    if (stepNum === 1) document.getElementById('step1').style.display = 'block';
+    if (stepNum === 2) document.getElementById('step2').style.display = 'block';
+}
 
 function startLocation() {
     const btn = document.getElementById('startBtn');
     btn.innerText = "📍 위치 파악 중...";
     btn.disabled = true;
 
-    // 1.5초 후 강제 진행 타이머
-    const forceMove = setTimeout(() => {
-        console.log("위치 응답 지연 - 강제 진행");
-        showStep1();
-    }, 1500);
+    const forceMove = setTimeout(() => showStep(1), 1500);
 
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(pos => {
@@ -98,35 +102,29 @@ function startLocation() {
                     if (status === naver.maps.Service.Status.OK && res.v2 && res.v2.address) {
                         currentAddr = res.v2.address.jibunAddress || "내 주변";
                     }
-                    showStep1();
+                    showStep(1);
                 });
             } else {
                 clearTimeout(forceMove);
-                showStep1();
+                showStep(1);
             }
         }, () => {
             clearTimeout(forceMove);
-            showStep1();
+            showStep(1);
         }, { timeout: 5000 });
     } else {
         clearTimeout(forceMove);
-        showStep1();
+        showStep(1);
     }
-}
-
-function showStep1() {
-    document.getElementById('startBtn').style.display = 'none';
-    document.getElementById('step1').style.display = 'block';
 }
 
 function selectFood(food) {
     currentFood = food;
-    document.getElementById('step1').style.display = 'none';
-    document.getElementById('step2').style.display = 'block';
+    showStep(2); // STEP 1 숨기고 STEP 2 열기
 }
 
 function fetchFinal(minutes) {
-    document.getElementById('step2').style.display = 'none';
+    showStep(0); // 모든 버튼 숨기기
     const resArea = document.getElementById('resultArea');
     resArea.innerHTML = "<p style='color:#666;'>✨ 최적의 맛집을 찾는 중...</p>";
 
@@ -136,6 +134,7 @@ function fetchFinal(minutes) {
             resArea.innerHTML = `<h2 style='text-align:left; font-size:1.1rem; color:#888;'>📍 ${currentAddr} 추천</h2>`;
             if (!data.items || data.items.length === 0) {
                 resArea.innerHTML += "<p>맛집 정보를 찾지 못했습니다.</p>";
+                resArea.innerHTML += `<button onclick="location.reload()" class="opt-btn" style="width:100%;">다시 시도</button>`;
                 return;
             }
             data.items.forEach(item => {
@@ -148,8 +147,10 @@ function fetchFinal(minutes) {
                     </div>
                 `;
             });
+            resArea.innerHTML += `<button onclick="location.reload()" class="opt-btn" style="width:100%; margin-top:20px; background:#444;">처음부터 다시하기</button>`;
         }).catch(() => {
-            resArea.innerHTML = "<p>오류가 발생했습니다. 다시 시도해 주세요.</p>";
+            resArea.innerHTML = "<p>오류가 발생했습니다.</p>";
+            resArea.innerHTML += `<button onclick="location.reload()" class="opt-btn" style="width:100%;">새로고침</button>`;
         });
 }
 </script>
