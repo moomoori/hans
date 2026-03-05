@@ -87,33 +87,36 @@ function startLocation() {
     btn.innerText = "📍 위치 파악 중...";
     btn.disabled = true;
 
-    const forceMove = setTimeout(() => showStep(1), 1500);
-
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(pos => {
             const lat = pos.coords.latitude;
             const lng = pos.coords.longitude;
             
+            // 좌표를 찍어보기 위한 로그 (F12 콘솔에서 확인 가능)
+            console.log("좌표 획득:", lat, lng);
+
             if (typeof naver !== 'undefined' && naver.maps.Service) {
                 naver.maps.Service.reverseGeocode({
                     coords: new naver.maps.LatLng(lat, lng)
                 }, (status, res) => {
-                    clearTimeout(forceMove);
+                    // 주소 변환 성공 시
                     if (status === naver.maps.Service.Status.OK && res.v2 && res.v2.address) {
-                        currentAddr = res.v2.address.jibunAddress || "내 주변";
+                        currentAddr = res.v2.address.jibunAddress || res.v2.address.roadAddress;
+                        console.log("실제 주소 획득:", currentAddr);
+                    } else {
+                        console.error("주소 변환 실패. 서비스 권한을 확인하세요.");
+                        // 주소 변환 실패 시 '강남역' 대신 대략적인 좌표 이름이라도 설정 (선택 사항)
                     }
                     showStep(1);
                 });
             } else {
-                clearTimeout(forceMove);
                 showStep(1);
             }
-        }, () => {
-            clearTimeout(forceMove);
+        }, (error) => {
+            console.error("GPS 획득 실패:", error);
             showStep(1);
-        }, { timeout: 5000 });
+        }, { enableHighAccuracy: true, timeout: 5000 });
     } else {
-        clearTimeout(forceMove);
         showStep(1);
     }
 }
