@@ -5,19 +5,26 @@ import random
 
 app = Flask(__name__)
 
-# 카카오 API 설정 (본인의 REST API 키를 입력하세요)
-KAKAO_API_KEY = os.environ.get("KAKAO_API_KEY")
+# 네이버 API 설정 (Render의 Environment 탭에 등록하세요)
+NAVER_CLIENT_ID = os.environ.get("NAVER_CLIENT_ID")
+NAVER_CLIENT_SECRET = os.environ.get("NAVER_CLIENT_SECRET")
 
 def get_random_restaurant(location="강남역", keyword="맛집"):
-    url = "https://dapi.kakao.com/v2/local/search/keyword.json"
-    headers = {"Authorization": f"KakaoAK {KAKAO_API_KEY}"}
-    params = {"query": f"{location} {keyword}", "category_group_code": "FD6"}
+    url = "https://openapi.naver.com/v1/search/local.json"
+    headers = {
+        "X-Naver-Client-Id": NAVER_CLIENT_ID,
+        "X-Naver-Client-Secret": NAVER_CLIENT_SECRET
+    }
+    params = {
+        "query": f"{location} {keyword}",
+        "display": 5  # 5개 검색 결과 중 랜덤 선택
+    }
     
     response = requests.get(url, headers=headers, params=params)
     if response.status_code == 200:
-        results = response.json().get('documents', [])
+        results = response.json().get('items', [])
         if results:
-            return random.choice(results) # 검색 결과 중 랜덤 하나 추출
+            return random.choice(results)
     return None
 
 @app.route('/')
@@ -37,8 +44,7 @@ def recommend():
             "link": restaurant['link']
         })
     return jsonify({"error": "맛집을 찾을 수 없습니다."}), 404
-
+    
 if __name__ == '__main__':
-    # 서버에서 지정한 포트(PORT)를 사용하고, 없으면 5000번 사용
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
