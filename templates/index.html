@@ -69,6 +69,7 @@
 let selectedLocation = "";
 let currentCategory = "";
 let startOffset = 1;
+let shownPlaces = new Set(); // 중복 방지를 위한 이름 저장소
 
 function goToFood() {
     const loc = document.getElementById('userLocation').value;
@@ -86,11 +87,13 @@ function fetchResults(food, isMore = false) {
     if (!isMore) {
         startOffset = 1;
         currentCategory = food;
+        shownPlaces.clear(); // 카테고리 변경 시 중복 저장소 초기화
         document.getElementById('step1').style.display = 'none';
-        document.getElementById('resultArea').innerHTML = "<p style='color:#888;'>✨ 평점 높은 맛집을 찾는 중...</p>";
+        document.getElementById('resultArea').innerHTML = "<p style='color:#888;'>✨ 새로운 맛집을 찾는 중...</p>";
         document.getElementById('buttonArea').innerHTML = "";
     } else {
-        document.getElementById('moreBtn').innerText = "⏳ 불러오는 중...";
+        const moreBtn = document.getElementById('moreBtn');
+        if(moreBtn) moreBtn.innerText = "⏳ 다음 맛집 찾는 중...";
     }
 
     fetch(`/recommend_v2?location=${selectedLocation}&food=${food}&start=${startOffset}`)
@@ -105,40 +108,56 @@ function fetchResults(food, isMore = false) {
 
             if (!data.items || data.items.length === 0) {
                 if (!isMore) resArea.innerHTML = "<p>검색 결과가 없습니다.</p>";
-                else alert("마지막 결과입니다.");
+                else alert("더 이상 새로운 맛집이 없습니다.");
                 if(document.getElementById('moreBtn')) document.getElementById('moreBtn').style.display = 'none';
                 return;
             }
 
-            // 기존 더보기 버튼 제거
+            // 기존 더보기 버튼 임시 제거
             const oldBtn = document.getElementById('moreBtn');
             if(oldBtn) oldBtn.remove();
 
+            let addedCount = 0;
             data.items.forEach(item => {
-                resArea.innerHTML += `
-                    <div class="result-item" onclick="window.open('${item.map_url}', '_blank')">
-                        <div class="item-category">${item.category}</div>
-                        <div class="item-name">${item.name}</div>
-                        <div class="item-info">📍 ${item.address}</div>
-                        <div class="go-map">네이버 지도로 보기 ➔</div>
-                    </div>
-                `;
+                // 중복 체크: Set에 이름이 없는 경우에만 추가
+                if (!shownPlaces.has(item.name)) {
+                    shownPlaces.add(item.name);
+                    addedCount++;
+                    
+                    resArea.innerHTML += `
+                        <div class="result-item" onclick="window.open('${item.map_url}', '_blank')">
+                            <div class="item-category">${item.category}</div>
+                            <div class="item-name">${item.name}</div>
+                            <div class="item-info">📍 ${item.address}</div>
+                            <div class="go-map">네이버 지도로 보기 ➔</div>
+                        </div>
+                    `;
+                }
             });
+
+            // 만약 10개를 가져왔는데 모두 중복이라 화면에 추가된 게 없다면 자동으로 다음 페이지 요청
+            if (addedCount === 0 && data.items.length > 0 && startOffset < 90) {
+                startOffset += 10;
+                fetchResults(food, true);
+                return;
+            }
 
             startOffset += 10;
             if (startOffset <= 90) {
                 btnArea.innerHTML = `
-                    <button id="moreBtn" onclick="fetchResults('${food}', true)">맛집 10개 더보기 (+)</button>
+                    <button id="moreBtn" onclick="fetchResults('${food}', true)">새로운 맛집 더보기 (+)</button>
                     <button class="reset-btn" onclick="location.reload()">처음으로 돌아가기</button>
                 `;
             } else {
                 btnArea.innerHTML = `<button class="reset-btn" onclick="location.reload()">처음으로 돌아가기</button>`;
             }
             
-            // 더보기 시 스크롤 약간 이동
-            if(isMore) {
+            if(isMore && addedCount > 0) {
                 window.scrollBy({ top: 300, behavior: 'smooth' });
             }
+        }).catch(err => {
+            console.error("Fetch error:", err);
+            alert("맛집 정보를 가져오는 데 실패했습니다.");
         });
 }
 </script>
