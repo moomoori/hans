@@ -2,112 +2,154 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Today's Stock Hot-Topic</title>
+    <title>Stock Hot-Topic Dashboard</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        :root { --primary: #007bff; --bg: #f4f7f6; }
-        body { font-family: 'Pretendard', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: var(--bg); color: #333; }
-        h2 { font-weight: 800; letter-spacing: -1px; }
+        :root { --primary: #007bff; --bg: #f4f7f6; --card: #ffffff; }
+        body { font-family: 'Pretendard', -apple-system, sans-serif; margin: 0; padding: 20px; background: var(--bg); color: #333; line-height: 1.6; }
         
-        /* 테마 탭 */
-        .tabs { display: flex; gap: 8px; margin-bottom: 20px; overflow-x: auto; white-space: nowrap; }
-        .tab-btn { padding: 10px 18px; border: none; border-radius: 25px; cursor: pointer; background: #fff; font-weight: 600; box-shadow: 0 2px 5px rgba(0,0,0,0.05); transition: 0.3s; }
+        /* Layout */
+        .container { display: flex; gap: 20px; max-width: 1000px; margin: 0 auto; align-items: flex-start; }
+        
+        /* Left Monitor */
+        .side-monitor { width: 240px; background: var(--card); border-radius: 20px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); position: sticky; top: 20px; flex-shrink: 0; }
+        .side-title { font-weight: 800; font-size: 16px; margin-bottom: 15px; color: #ff4757; display: flex; align-items: center; gap: 8px; }
+        .hot-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px dashed #eee; cursor: pointer; transition: 0.2s; }
+        .hot-item:hover { color: var(--primary); transform: translateX(5px); }
+        .rank { font-weight: 800; color: var(--primary); width: 20px; }
+        .name { font-size: 14px; font-weight: 600; flex: 1; margin-left: 10px; }
+        .cnt { font-size: 11px; color: #999; }
+
+        /* Main Area */
+        .main-content { flex: 1; min-width: 0; }
+        h2 { font-weight: 800; letter-spacing: -1px; margin-top: 0; }
+
+        /* Tabs & Badges */
+        .tabs { display: flex; gap: 8px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 5px; scrollbar-width: none; }
+        .tab-btn { padding: 10px 18px; border: none; border-radius: 25px; cursor: pointer; background: #fff; font-weight: 600; font-size: 13px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); flex-shrink: 0; }
         .tab-btn.active { background: var(--primary); color: white; }
+        
+        .stock-badges { display: flex; gap: 10px; margin-bottom: 25px; overflow-x: auto; padding: 5px 0; scrollbar-width: none; }
+        .badge { min-width: 100px; padding: 15px; background: white; border-radius: 15px; cursor: pointer; text-align: center; border: 2px solid transparent; box-shadow: 0 2px 8px rgba(0,0,0,0.05); flex-shrink: 0; transition: 0.2s; }
+        .badge.active { border-color: var(--primary); transform: translateY(-3px); }
+        .b-name { font-weight: 700; font-size: 14px; }
+        .b-cnt { font-size: 11px; color: var(--primary); margin-top: 4px; font-weight: 600; }
 
-        /* 종목 TOP 5 카드 */
-        .stock-list { display: flex; gap: 8px; margin-bottom: 25px; overflow-x: auto; padding: 5px 0; }
-        .stock-badge { min-width: 90px; padding: 12px; background: white; border-radius: 12px; cursor: pointer; text-align: center; border: 2px solid transparent; transition: 0.2s; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-        .stock-badge.active { border-color: var(--primary); transform: translateY(-3px); }
-        .stock-name { font-weight: 700; font-size: 14px; }
-        .stock-count { font-size: 11px; color: #888; margin-top: 4px; }
-
-        /* 뉴스 피드 */
-        .news-container { background: white; border-radius: 18px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-        .news-header { font-weight: 700; margin-bottom: 15px; font-size: 18px; display: flex; justify-content: space-between; align-items: center; }
-        .update-tag { font-size: 11px; color: #10b981; font-weight: normal; }
-        .news-item { padding: 16px 0; border-bottom: 1px solid #f0f0f0; transition: 0.2s; }
+        /* News Feed */
+        .news-box { background: white; border-radius: 20px; padding: 25px; box-shadow: 0 4px 20px rgba(0,0,0,0.04); min-height: 500px; display: flex; flex-direction: column; }
+        .news-item { padding: 18px 0; border-bottom: 1px solid #f1f3f5; }
         .news-item:last-child { border-bottom: none; }
         .news-item a { text-decoration: none; color: inherit; }
-        .news-item .title { font-size: 15px; line-height: 1.4; font-weight: 500; margin-bottom: 6px; display: block; }
-        .news-item .meta { color: #999; font-size: 12px; display: flex; align-items: center; gap: 8px; }
+        .news-item .title { font-size: 15px; font-weight: 600; margin-bottom: 8px; display: block; line-height: 1.5; }
+        .news-item .meta { font-size: 12px; color: #adb5bd; }
+
+        /* Pagination */
+        .pagination { display: flex; justify-content: center; gap: 6px; margin-top: auto; padding-top: 30px; }
+        .page-btn { width: 34px; height: 34px; border: 1px solid #e9ecef; background: white; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px; transition: 0.2s; }
+        .page-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+        @media (max-width: 850px) {
+            .container { flex-direction: column; }
+            .side-monitor { width: 100%; position: static; box-sizing: border-box; }
+        }
     </style>
 </head>
 <body>
-    <h2>📈 테마별 뉴스 TOP 5</h2>
-    
-    <div class="tabs">
-        <button class="tab-btn active" onclick="loadTopStocks('반도체', this)">반도체</button>
-        <button class="tab-btn" onclick="loadTopStocks('2차전지', this)">2차전지</button>
-        <button class="tab-btn" onclick="loadTopStocks('AI/로봇', this)">AI/로봇</button>
-        <button class="tab-btn" onclick="loadTopStocks('바이오', this)">바이오</button>
-    </div>
+    <div class="container">
+        <aside class="side-monitor">
+            <div class="side-title">🔥 실시간 통합 TOP 5</div>
+            <div id="side-list"></div>
+        </aside>
 
-    <div id="stock-list" class="stock-list"></div>
-
-    <div class="news-container">
-        <div class="news-header">
-            <span id="news-title">최신 뉴스</span>
-            <span class="update-tag">● 실시간 업데이트 중</span>
-        </div>
-        <div id="news-list"></div>
+        <main class="main-content">
+            <h2>📈 뉴스 키워드 분석</h2>
+            <div class="tabs">
+                <button class="tab-btn active" onclick="changeTheme('반도체', this)">반도체</button>
+                <button class="tab-btn" onclick="changeTheme('2차전지', this)">2차전지</button>
+                <button class="tab-btn" onclick="changeTheme('AI/로봇', this)">AI/로봇</button>
+                <button class="tab-btn" onclick="changeTheme('바이오', this)">바이오</button>
+            </div>
+            <div id="badge-list" class="stock-badges"></div>
+            
+            <div class="news-box">
+                <div id="news-list"></div>
+                <div id="pagination" class="pagination"></div>
+            </div>
+        </main>
     </div>
 
     <script>
-        function timeAgo(dateStr) {
-            const date = new Date(dateStr);
-            const now = new Date();
-            const diff = Math.floor((now - date) / 1000 / 60);
-            if (diff < 1) return '방금 전';
-            if (diff < 60) return `${diff}분 전`;
-            if (diff < 1440) return `${Math.floor(diff/60)}시간 전`;
-            return `${date.getFullYear()}.${date.getMonth()+1}.${date.getDate()}`;
+        let allNews = [];
+        const perPage = 10;
+
+        function timeAgo(d) {
+            const diff = Math.floor((new Date() - new Date(d)) / 60000);
+            return diff < 1 ? '방금 전' : diff < 60 ? `${diff}분 전` : diff < 1440 ? `${Math.floor(diff/60)}시간 전` : d.split(' ')[0];
         }
 
-        function loadTopStocks(theme, btn) {
+        function loadMonitor() {
+            fetch('/get_all_top_stocks').then(r => r.json()).then(data => {
+                document.getElementById('side-list').innerHTML = data.map((s, i) => `
+                    <div class="hot-item" onclick="loadNews('${s.name}')">
+                        <span class="rank">${i+1}</span>
+                        <span class="name">${s.name}</span>
+                        <span class="cnt">${s.count}회</span>
+                    </div>
+                `).join('');
+            });
+        }
+
+        function changeTheme(theme, btn) {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-
-            fetch(`/get_top_stocks?theme=${theme}`)
-                .then(res => res.json())
-                .then(data => {
-                    const list = document.getElementById('stock-list');
-                    list.innerHTML = data.map((s, i) => `
-                        <div class="stock-badge ${i===0?'active':''}" onclick="loadNews('${s.name}', this)">
-                            <div class="stock-name">${s.name}</div>
-                            <div class="stock-count">급상승 ${s.count}회</div>
-                        </div>
-                    `).join('');
-                    if(data.length > 0) loadNews(data[0].name);
-                });
+            fetch(`/get_top_stocks?theme=${theme}`).then(r => r.json()).then(data => {
+                document.getElementById('badge-list').innerHTML = data.map((s, i) => `
+                    <div class="badge ${i===0?'active':''}" onclick="loadNews('${s.name}', this)">
+                        <div class="b-name">${s.name}</div>
+                        <div class="b-cnt">${s.count}회 언급</div>
+                    </div>
+                `).join('');
+                if(data.length) loadNews(data[0].name);
+            });
         }
 
-        function loadNews(stock, element) {
-            if(element) {
-                document.querySelectorAll('.stock-badge').forEach(b => b.classList.remove('active'));
-                element.classList.add('active');
+        function loadNews(stock, el) {
+            if(el) {
+                document.querySelectorAll('.badge').forEach(b => b.classList.remove('active'));
+                el.classList.add('active');
             }
-            document.getElementById('news-title').innerText = `${stock}`;
-
-            fetch(`/get_stock_news?stock=${stock}`)
-                .then(res => res.json())
-                .then(data => {
-                    const list = document.getElementById('news-list');
-                    list.innerHTML = data.map(n => `
-                        <div class="news-item">
-                            <a href="${n.link}" target="_blank">
-                                <span class="title">${n.title}</span>
-                                <div class="meta">
-                                    <span>${timeAgo(n.pubDate)}</span>
-                                    <span>•</span>
-                                    <span>자세히 보기</span>
-                                </div>
-                            </a>
-                        </div>
-                    `).join('');
-                });
+            fetch(`/get_stock_news?stock=${stock}`).then(r => r.json()).then(data => {
+                allNews = data;
+                renderPage(1);
+                loadMonitor(); // 종목 클릭 시 모니터도 함께 갱신
+            });
         }
 
-        window.onload = () => loadTopStocks('반도체', document.querySelector('.tab-btn'));
+        function renderPage(p) {
+            const start = (p-1)*perPage;
+            document.getElementById('news-list').innerHTML = allNews.slice(start, start+perPage).map(n => `
+                <div class="news-item">
+                    <a href="${n.link}" target="_blank">
+                        <span class="title">${n.title}</span>
+                        <div class="meta">${timeAgo(n.pubDate)} • 자세히 보기</div>
+                    </a>
+                </div>
+            `).join('');
+            
+            const total = Math.ceil(allNews.length / perPage);
+            let pgHtml = '';
+            for(let i=1; i<=total; i++) {
+                pgHtml += `<button class="page-btn ${i===p?'active':''}" onclick="renderPage(${i})">${i}</button>`;
+            }
+            document.getElementById('pagination').innerHTML = pgHtml;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        window.onload = () => {
+            changeTheme('반도체', document.querySelector('.tab-btn'));
+            loadMonitor();
+            setInterval(loadMonitor, 60000); // 1분마다 모니터 자동 갱신
+        };
     </script>
 </body>
 </html>
