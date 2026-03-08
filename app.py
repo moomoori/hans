@@ -19,25 +19,23 @@ def update_stock_dictionary():
     print("🚀 KRX 상장사 명단을 가져오는 중...")
     try:
         url = "https://kind.or.kr/corpgeneral/corpList.do?method=download"
-        
-        # 1. SSL 인증서 검사 무효화 설정 (전역 설정)
-        context = ssl._create_unverified_context()
-        
-        # 2. 인증서 무시하고 데이터 가져오기 (requests 대신 pandas 직접 호출 시)
-        # header를 추가해야 보안 장벽을 더 잘 넘습니다.
         headers = {'User-Agent': 'Mozilla/5.0'}
         
-        # 3. urllib3 경고 끄기
+        # SSL 경고 무시
         import urllib3
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         
-        # 4. requests로 먼저 데이터를 받고 BytesIO로 전달
+        # 데이터를 가져옵니다.
         res = requests.get(url, verify=False, headers=headers, timeout=10)
         
-        # HTML을 읽을 때 lxml 엔진을 명시적으로 사용
-        df = pd.read_html(BytesIO(res.content), header=0)[0]
+        # [중요] 응답의 인코딩을 cp949(한글 완성형)로 설정합니다.
+        res.encoding = 'cp949' 
         
-        # 종목코드 6자리 포맷팅 및 사전 생성
+        # 인코딩된 텍스트를 pandas로 읽습니다.
+        # html5lib 대신 lxml로도 충분할 수 있지만 설치하셨으니 그대로 둡니다.
+        df = pd.read_html(BytesIO(res.content), header=0, encoding='cp949')[0]
+        
+        # 종목코드 6자리 포맷팅
         df['종목코드'] = df['종목코드'].apply(lambda x: f"{x:06d}")
         stock_dict = df.set_index('회사명')['종목코드'].to_dict()
         
@@ -46,8 +44,7 @@ def update_stock_dictionary():
         
     except Exception as e:
         print(f"❌ 사전 업데이트 실패: {e}")
-        # 실패 시 최소한의 기본 리스트 반환 (서버 중단 방지)
-        return {"삼성전자": "005930", "SK하이닉스": "000660", "현대차": "005380"}
+        return {"삼성전자": "005930", "SK하이닉스": "000660"}
 
 STOCK_MASTER = update_stock_dictionary()
 STOCK_NAMES = list(STOCK_MASTER.keys())
