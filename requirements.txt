@@ -4,3 +4,4 @@ gunicorn
 pandas
 lxml
 yfinance
+html5lib
