@@ -18,22 +18,35 @@ SEARCH_SECRET = os.environ.get('NAVER_SEARCH_SECRET')
 def update_stock_dictionary():
     print("🚀 KRX 상장사 명단을 가져오는 중...")
     try:
+        # KIND의 엑셀 다운로드 URL
         url = "https://kind.or.kr/corpgeneral/corpList.do?method=download"
-        headers = {'User-Agent': 'Mozilla/5.0'}
         
-        # SSL 경고 무시
+        # [핵심] 브라우저인 척 속이는 헤더 정보 추가
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Referer': 'https://kind.or.kr/corpgeneral/corpList.do?method=main'
+        }
+        
         import urllib3
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         
-        # 데이터를 가져옵니다.
-        res = requests.get(url, verify=False, headers=headers, timeout=10)
+        # 데이터를 가져올 때 headers를 꼭 포함합니다.
+        res = requests.get(url, verify=False, headers=headers, timeout=15)
+        res.encoding = 'cp949'
         
-        # [중요] 응답의 인코딩을 cp949(한글 완성형)로 설정합니다.
-        res.encoding = 'cp949' 
+        # [중요] lxml 엔진을 직접 명시하여 HTML 표를 찾게 합니다.
+        # pandas 2.0 이상에서는 여기서 'No tables found'가 자주 나는데, 
+        # StringIO나 BytesIO 처리를 명확히 해줍니다.
+        from io import StringIO
+        html_content = res.text
         
-        # 인코딩된 텍스트를 pandas로 읽습니다.
-        # html5lib 대신 lxml 엔진을 사용하도록 명시 (더 빠르고 가볍습니다)
-        df = pd.read_html(BytesIO(res.content), header=0, encoding='cp949')[0]
+        # 표가 있는지 먼저 확인 후 파싱
+        if '<table>' not in html_content.lower():
+            print("⚠️ 표를 찾지 못했습니다. 원본 텍스트 일부:", html_content[:100])
+            raise ValueError("HTML에 table 태그가 없습니다.")
+
+        df = pd.read_html(StringIO(html_content))[0]
+        
         # 종목코드 6자리 포맷팅
         df['종목코드'] = df['종목코드'].apply(lambda x: f"{x:06d}")
         stock_dict = df.set_index('회사명')['종목코드'].to_dict()
@@ -43,8 +56,9 @@ def update_stock_dictionary():
         
     except Exception as e:
         print(f"❌ 사전 업데이트 실패: {e}")
-        return {"삼성전자": "005930", "SK하이닉스": "000660"}
-
+        # 실패 시 수익화 서비스를 중단시키지 않기 위한 최소한의 데이터
+        return {"삼성전자": "005930", "SK하이닉스": "000660", "네이버": "035420", "에코프로": "086520"}
+        
 STOCK_MASTER = update_stock_dictionary()
 STOCK_NAMES = list(STOCK_MASTER.keys())
 
