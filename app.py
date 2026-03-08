@@ -8,6 +8,7 @@ from io import BytesIO
 import yfinance as yf
 import xml.etree.ElementTree as ET
 import ssl # 상단에 추가
+import FinanceDataReader as fdr  # 추가
 
 app = Flask(__name__)
 
@@ -15,71 +16,46 @@ SEARCH_ID = os.environ.get('NAVER_SEARCH_ID')
 SEARCH_SECRET = os.environ.get('NAVER_SEARCH_SECRET')
 
 # --- [1. 종목 사전 및 티커 매핑] ---
+# --- [1. 종목 사전 자동 업데이트 - FinanceDataReader 활용] ---
 def update_stock_dictionary():
-    print("🚀 KRX 상장사 명단을 가져오는 중...")
+    print("🚀 FinanceDataReader를 통해 종목 명단을 가져오는 중...")
     try:
-        # KIND의 엑셀 다운로드 URL
-        url = "https://kind.or.kr/corpgeneral/corpList.do?method=download"
+        # KRX(코스피, 코스닥, 코넥스) 전체 종목 리스트를 가져옵니다.
+        df = fdr.StockListing('KRX')
         
-        # [핵심] 브라우저인 척 속이는 헤더 정보 추가
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-            'Referer': 'https://kind.or.kr/corpgeneral/corpList.do?method=main'
-        }
+        # 종목명과 종목코드를 매핑 (Code 컬럼 사용)
+        # FinanceDataReader는 코드를 문자열로 예쁘게 가져와줍니다.
+        stock_dict = df.set_index('Name')['Code'].to_dict()
         
-        import urllib3
-        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-        
-        # 데이터를 가져올 때 headers를 꼭 포함합니다.
-        res = requests.get(url, verify=False, headers=headers, timeout=15)
-        res.encoding = 'cp949'
-        
-        # [중요] lxml 엔진을 직접 명시하여 HTML 표를 찾게 합니다.
-        # pandas 2.0 이상에서는 여기서 'No tables found'가 자주 나는데, 
-        # StringIO나 BytesIO 처리를 명확히 해줍니다.
-        from io import StringIO
-        html_content = res.text
-        
-        # 표가 있는지 먼저 확인 후 파싱
-        if '<table>' not in html_content.lower():
-            print("⚠️ 표를 찾지 못했습니다. 원본 텍스트 일부:", html_content[:100])
-            raise ValueError("HTML에 table 태그가 없습니다.")
-
-        df = pd.read_html(StringIO(html_content))[0]
-        
-        # 종목코드 6자리 포맷팅
-        df['종목코드'] = df['종목코드'].apply(lambda x: f"{x:06d}")
-        stock_dict = df.set_index('회사명')['종목코드'].to_dict()
-        
-        print(f"✅ 총 {len(stock_dict)}개 종목 로드 완료")
+        print(f"✅ 총 {len(stock_dict)}개 종목 로드 완료 (FDR 방식)")
         return stock_dict
-        
     except Exception as e:
-        print(f"❌ 사전 업데이트 실패: {e}")
-        # 실패 시 수익화 서비스를 중단시키지 않기 위한 최소한의 데이터
-        return {"삼성전자": "005930", "SK하이닉스": "000660", "네이버": "035420", "에코프로": "086520"}
-        
+        print(f"❌ FDR 로드 실패: {e}. 내장 사전으로 전환합니다.")
+        return {"삼성전자": "005930", "SK하이닉스": "000660", "현대차": "005380"}
+
 STOCK_MASTER = update_stock_dictionary()
 STOCK_NAMES = list(STOCK_MASTER.keys())
 
-# --- [2. 주가 정보 가져오기] ---
+# --- [2. 주가 정보 및 뉴스 로직 (기존과 동일)] ---
 def get_stock_price(stock_name):
     code = STOCK_MASTER.get(stock_name)
     if not code: return None
     
-    # 한국 주식은 .KS(코스피) 또는 .KQ(코스닥) 접미사가 필요함
-    # 여기서는 간단히 두 곳 다 시도하거나 기본 처리
+    # 한국 주식 티커 설정
     ticker_symbol = f"{code}.KS" 
     try:
         ticker = yf.Ticker(ticker_symbol)
-        # 코스피(.KS)에서 먼저 찾아보고 데이터가 없으면 코스닥(.KQ)으로 재시도
-        ticker = yf.Ticker(f"{code}.KS")
-        if ticker.fast_info.last_price is None:
-            ticker = yf.Ticker(f"{code}.KQ")
-        data = ticker.fast_info
-        current_price = data.last_price
-        prev_close = data.previous_close
+        # .fast_info가 가끔 에러날 수 있어 .history로 보완
+        hist = ticker.history(period="2d")
+        if hist.empty:
+            ticker_symbol = f"{code}.KQ" # 코스닥 재시도
+            ticker = yf.Ticker(ticker_symbol)
+            hist = ticker.history(period="2d")
+            
+        current_price = hist['Close'].iloc[-1]
+        prev_close = hist['Close'].iloc[-2]
         change_pct = ((current_price - prev_close) / prev_close) * 100
+        
         return {
             "price": f"{int(current_price):,}",
             "change": round(change_pct, 2),

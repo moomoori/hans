@@ -5,3 +5,4 @@ pandas
 lxml
 yfinance
 html5lib
+finance-datareader
