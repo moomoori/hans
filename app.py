@@ -33,8 +33,7 @@ def update_stock_dictionary():
         
         # 인코딩된 텍스트를 pandas로 읽습니다.
         # html5lib 대신 lxml 엔진을 사용하도록 명시 (더 빠르고 가볍습니다)
-        df = pd.read_html(BytesIO(res.content), header=0, encoding='cp949', engine='lxml')[0]
-        
+        df = pd.read_html(BytesIO(res.content), header=0, encoding='cp949')[0]
         # 종목코드 6자리 포맷팅
         df['종목코드'] = df['종목코드'].apply(lambda x: f"{x:06d}")
         stock_dict = df.set_index('회사명')['종목코드'].to_dict()
