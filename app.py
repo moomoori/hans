@@ -15,9 +15,17 @@ SEARCH_SECRET = os.environ.get('NAVER_SEARCH_SECRET')
 
 # --- [1. 종목 사전 및 티커 매핑] ---
 def update_stock_dictionary():
+    print("🚀 KRX 상장사 명단을 가져오는 중...")
     try:
         url = "https://kind.or.kr/corpgeneral/corpList.do?method=download"
-        res = requests.get(url)
+        
+        # verify=False 를 추가하여 SSL 인증서 검사를 건너뜁니다.
+        # 인증서 오류 경고를 숨기기 위해 urllib3 설정을 추가하면 더 깔끔합니다.
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        
+        res = requests.get(url, verify=False) 
+        
         df = pd.read_html(BytesIO(res.content), header=0)[0]
         # 종목명과 종목코드를 함께 저장 (주가 조회를 위해)
         df['종목코드'] = df['종목코드'].apply(lambda x: f"{x:06d}")
