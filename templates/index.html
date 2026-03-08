@@ -114,16 +114,33 @@
         }
 
         function loadNews(stock, el) {
-            if(el) {
-                document.querySelectorAll('.badge').forEach(b => b.classList.remove('active'));
-                el.classList.add('active');
-            }
-            fetch(`/get_stock_news?stock=${stock}`).then(r => r.json()).then(data => {
-                allNews = data;
-                renderPage(1);
-                loadMonitor(); // 종목 클릭 시 모니터도 함께 갱신
-            });
+        if(el) {
+            document.querySelectorAll('.badge').forEach(b => b.classList.remove('active'));
+            el.classList.add('active');
         }
+        
+        // 뉴스 박스 상단에 주가 정보를 뿌려줌
+        fetch(`/get_stock_info?stock=${stock}`).then(r => r.json()).then(data => {
+            const info = data.price_info;
+            const priceHtml = info ? `
+                <div style="background:#f8f9fa; padding:15px; border-radius:12px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; border-left:5px solid ${info.change >= 0 ? '#ff4757' : '#2f3542'}">
+                    <div>
+                        <span style="font-size:12px; color:#888;">실시간 시세</span><br>
+                        <span style="font-size:20px; font-weight:800;">${info.price}원</span>
+                    </div>
+                    <div style="text-align:right;">
+                        <span style="color:${info.change >= 0 ? '#ff4757' : '#007bff'}; font-weight:700; font-size:16px;">
+                            ${info.change >= 0 ? '▲' : '▼'} ${Math.abs(info.change)}%
+                        </span>
+                    </div>
+                </div>
+            ` : '';
+            
+            document.getElementById('news-title').innerHTML = `${stock} ${priceHtml}`;
+            allNews = data.news;
+            renderPage(1);
+        });
+    }
 
         function renderPage(p) {
             const start = (p-1)*perPage;

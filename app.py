@@ -5,60 +5,76 @@ import re
 import time
 import pandas as pd
 from io import BytesIO
+import yfinance as yf
+import xml.etree.ElementTree as ET
 
 app = Flask(__name__)
 
-# 환경변수 (Render 설정: NAVER_SEARCH_ID, NAVER_SEARCH_SECRET)
 SEARCH_ID = os.environ.get('NAVER_SEARCH_ID')
 SEARCH_SECRET = os.environ.get('NAVER_SEARCH_SECRET')
 
-# --- [1. 종목 사전 자동 업데이트 로직] ---
+# --- [1. 종목 사전 및 티커 매핑] ---
 def update_stock_dictionary():
-    """한국거래소(KRX) 상장법인 목록을 가져와 종목 사전 생성"""
-    print("🚀 종목 사전을 최신 상태로 업데이트 중...")
     try:
-        # KIND 상장법인 목록 다운로드 URL (가장 가볍고 정확함)
         url = "https://kind.or.kr/corpgeneral/corpList.do?method=download"
         res = requests.get(url)
-        
-        # HTML 표 형식의 데이터를 pandas로 읽기
         df = pd.read_html(BytesIO(res.content), header=0)[0]
-        
-        # '회사명' 컬럼만 추출하여 리스트화
-        stock_list = df['회사명'].tolist()
-        
-        # 2글자 미만 또는 너무 일반적인 단어 제외 (필터링)
-        # 예: '기아', '현대' 등은 오탐지가 잦을 수 있으나 종목명 그대로 유지
-        stock_list = [s for s in stock_list if len(str(s)) >= 2]
-        
-        print(f"✅ 총 {len(stock_list)}개의 종목이 사전에 등록되었습니다.")
-        return list(set(stock_list))
+        # 종목명과 종목코드를 함께 저장 (주가 조회를 위해)
+        df['종목코드'] = df['종목코드'].apply(lambda x: f"{x:06d}")
+        stock_dict = df.set_index('회사명')['종목코드'].to_dict()
+        return stock_dict
     except Exception as e:
-        print(f"❌ 사전 업데이트 실패: {e}")
-        # 실패 시 최소한의 우량주 리스트로 대체
-        return ["삼성전자", "SK하이닉스", "LG에너지솔루션", "현대차", "셀트리온", "네이버", "카카오"]
+        print(f"사전 업데이트 실패: {e}")
+        return {"삼성전자": "005930", "SK하이닉스": "000660"}
 
-# 서버 시작 시 종목 사전 로드
-STOCK_DICTIONARY = update_stock_dictionary()
+STOCK_MASTER = update_stock_dictionary()
+STOCK_NAMES = list(STOCK_MASTER.keys())
 
-# --- [2. 캐싱 및 헬퍼 함수] ---
-stock_cache = {}
-news_cache = {}
-CACHE_EXPIRE = 600  # 10분
+# --- [2. 주가 정보 가져오기] ---
+def get_stock_price(stock_name):
+    code = STOCK_MASTER.get(stock_name)
+    if not code: return None
+    
+    # 한국 주식은 .KS(코스피) 또는 .KQ(코스닥) 접미사가 필요함
+    # 여기서는 간단히 두 곳 다 시도하거나 기본 처리
+    ticker_symbol = f"{code}.KS" 
+    try:
+        ticker = yf.Ticker(ticker_symbol)
+        # 코스피(.KS)에서 먼저 찾아보고 데이터가 없으면 코스닥(.KQ)으로 재시도
+        ticker = yf.Ticker(f"{code}.KS")
+        if ticker.fast_info.last_price is None:
+            ticker = yf.Ticker(f"{code}.KQ")
+        data = ticker.fast_info
+        current_price = data.last_price
+        prev_close = data.previous_close
+        change_pct = ((current_price - prev_close) / prev_close) * 100
+        return {
+            "price": f"{int(current_price):,}",
+            "change": round(change_pct, 2),
+            "symbol": ticker_symbol
+        }
+    except:
+        return None
 
-def get_headers():
-    return {
-        "X-Naver-Client-Id": SEARCH_ID,
-        "X-Naver-Client-Secret": SEARCH_SECRET
-    }
+# --- [3. 구글 뉴스 확장 (RSS)] ---
+def get_google_news(query):
+    rss_url = f"https://news.google.com/rss/search?q={query}&hl=ko&gl=KR&ceid=KR:ko"
+    try:
+        res = requests.get(rss_url)
+        root = ET.fromstring(res.text)
+        news_items = []
+        for item in root.findall('.//item')[:10]: # 상위 10개만
+            news_items.append({
+                "title": item.find('title').text,
+                "link": item.find('link').text,
+                "pubDate": item.find('pubDate').text,
+                "source": "Google"
+            })
+        return news_items
+    except:
+        return []
 
-def clean_html(text):
-    if not text: return ""
-    clean = re.sub('<[^>]*>', '', text)
-    clean = clean.replace('&quot;', '"').replace('&apos;', "'").replace('&amp;', '&')
-    return clean
-
-# --- [3. 웹 라우팅] ---
+# --- [4. 라우팅] ---
 
 @app.route('/')
 def index():
@@ -67,67 +83,43 @@ def index():
 @app.route('/get_top_stocks')
 def get_top_stocks():
     theme = request.args.get('theme', '반도체')
-    now = time.time()
-
-    if theme in stock_cache and (now - stock_cache[theme]['time'] < CACHE_EXPIRE):
-        return jsonify(stock_cache[theme]['data'])
-
-    # 뉴스 수집 (관련도순 100개)
     url = f"https://openapi.naver.com/v1/search/news.json?query={theme}&display=100&sort=sim"
+    headers = {"X-Naver-Client-Id": SEARCH_ID, "X-Naver-Client-Secret": SEARCH_SECRET}
     
     try:
-        res = requests.get(url, headers=get_headers())
+        res = requests.get(url, headers=headers)
         items = res.json().get('items', [])
+        all_content = " ".join([i['title'] for i in items])
         
-        # 제목 + 요약글 통합 텍스트
-        all_content = " ".join([clean_html(item['title'] + " " + item['description']) for item in items])
-        
-        # 종목 사전과 매칭 (성능을 위해 텍스트에 포함된 것만 카운트)
         counts = []
-        for s in STOCK_DICTIONARY:
-            if s in all_content:
-                count = all_content.count(s)
-                counts.append({"name": s, "count": count})
+        for name in STOCK_NAMES:
+            if name in all_content:
+                counts.append({"name": name, "count": all_content.count(name)})
         
-        # 많이 언급된 순 정렬
         top5 = sorted(counts, key=lambda x: x['count'], reverse=True)[:5]
-        
-        if not top5:
-            top5 = [{"name": f"{theme} 관련주 분석 중", "count": 0}]
-
-        stock_cache[theme] = {'data': top5, 'time': now}
         return jsonify(top5)
-    except Exception as e:
-        print(f"Error: {e}")
+    except:
         return jsonify([])
 
-@app.route('/get_stock_news')
-def get_stock_news():
+@app.route('/get_stock_info')
+def get_stock_info():
     stock = request.args.get('stock')
-    now = time.time()
-
-    if stock in news_cache and (now - news_cache[stock]['time'] < CACHE_EXPIRE):
-        return jsonify(news_cache[stock]['data'])
-
-    url = f"https://openapi.naver.com/v1/search/news.json?query={stock}&display=20&sort=date"
+    price_data = get_stock_price(stock)
     
-    try:
-        res = requests.get(url, headers=get_headers())
-        items = res.json().get('items', [])
-        
-        results = []
-        for item in items:
-            results.append({
-                "title": clean_html(item['title']),
-                "link": item.get('originallink') or item.get('link'),
-                "pubDate": item['pubDate']
-            })
-        
-        news_cache[stock] = {'data': results, 'time': now}
-        return jsonify(results)
-    except Exception as e:
-        return jsonify([])
+    # 네이버 뉴스
+    headers = {"X-Naver-Client-Id": SEARCH_ID, "X-Naver-Client-Secret": SEARCH_SECRET}
+    n_url = f"https://openapi.naver.com/v1/search/news.json?query={stock}&display=20&sort=date"
+    n_res = requests.get(n_url, headers=headers).json().get('items', [])
+    naver_news = [{"title": re.sub('<[^>]*>', '', i['title']), "link": i['link'], "pubDate": i['pubDate'], "source": "Naver"} for i in n_res]
+    
+    # 구글 뉴스 통합
+    google_news = get_google_news(stock)
+    combined_news = sorted(naver_news + google_news, key=lambda x: x['pubDate'], reverse=True)
+    
+    return jsonify({
+        "price_info": price_data,
+        "news": combined_news
+    })
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=10000)
