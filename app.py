@@ -3,6 +3,7 @@ import requests
 from flask import Flask, render_template, jsonify, request
 import re
 import time
+import random
 from datetime import datetime
 import pandas as pd
 from io import StringIO
@@ -39,7 +40,6 @@ STOCK_NAMES = list(STOCK_MASTER.keys())
 
 # --- [2. 시간 정렬을 위한 파서] ---
 def parse_date_to_ts(date_str):
-    """네이버/구글의 다양한 날짜 형식을 비교 가능한 숫자로 변환"""
     formats = [
         '%a, %d %b %Y %H:%M:%S %Z',    # Google (GMT)
         '%a, %d %b %Y %H:%M:%S +0900', # Naver (KST)
@@ -84,26 +84,19 @@ def index():
 @app.route('/get_top_stocks')
 def get_top_stocks():
     theme = request.args.get('theme', '반도체')
-    # 네이버 API에서 뉴스 100개를 가져옵니다.
     url = f"https://openapi.naver.com/v1/search/news.json?query={theme}&display=100&sort=date"
     headers = {"X-Naver-Client-Id": SEARCH_ID, "X-Naver-Client-Secret": SEARCH_SECRET}
     
     try:
         res = requests.get(url, headers=headers).json().get('items', [])
-        
-        # 종목별 언급 횟수를 담을 딕셔너리
         counts_dict = {name: 0 for name in STOCK_NAMES}
         
         for item in res:
-            # 제목 + 요약문을 하나로 합쳐서 검색 대상 생성
             content = (item['title'] + item['description']).replace('<b>', '').replace('</b>', '')
-            
             for name in STOCK_NAMES:
-                # 뉴스 1개당 종목명이 포함되어 있다면 딱 1회만 카운트 (중복 방지)
                 if name in content:
                     counts_dict[name] += 1
         
-        # 0회 언급된 종목은 제외하고 상위 5개 추출
         top5 = []
         for name, count in counts_dict.items():
             if count > 0:
@@ -116,7 +109,7 @@ def get_top_stocks():
             
         return jsonify(top5)
     except Exception as e:
-        print(f"❌ 언급 수 계산 중 오류: {e}")
+        print(f"❌ 오류: {e}")
         return jsonify([])
 
 @app.route('/get_stock_info')
@@ -131,7 +124,6 @@ def get_stock_info():
     google_news = [{"title": i['title'], "link": i['link'], "pubDate": i['pubDate'], 
                     "ts": parse_date_to_ts(i['pubDate']), "source": "Google"} for i in get_google_news(stock)]
     
-    # 통합 정렬 (최신순)
     combined = sorted(naver_news + google_news, key=lambda x: x['ts'], reverse=True)
     return jsonify({"price_info": get_stock_price(stock), "news": combined})
 
@@ -148,6 +140,34 @@ def get_all_top_stocks():
     sorted_all = sorted([{"name": k, "count": v} for k, v in all_counts.items()], 
                         key=lambda x: x['count'], reverse=True)[:5]
     return jsonify({"stocks": sorted_all, "update_time": last_time})
+
+# --- [추가된 데일리 리포트 기능] ---
+@app.route('/get_daily_report')
+def get_daily_report():
+    if not stock_cache:
+        return jsonify({"report": "실시간 시장 트렌드를 분석 중입니다. 데이터를 수집할 때까지 잠시만 기다려 주세요."})
+    
+    all_items = []
+    for theme in stock_cache:
+        for item in stock_cache[theme]['data']:
+            all_items.append(item)
+    
+    if not all_items:
+        return jsonify({"report": "분석할 데이터가 부족합니다. 종목 탭을 클릭해 보세요!"})
+
+    # 가장 언급량이 많은 종목 추출
+    top_stock = sorted(all_items, key=lambda x: x['count'], reverse=True)[0]
+    
+    templates = [
+        f"오늘 투자자들은 '{top_stock['name']}'에 가장 주목하고 있습니다. 뉴스 요약문 기준 {top_stock['count']}건의 기사에서 언급되었습니다.",
+        f"현재 시장의 가장 뜨거운 키워드는 '{top_stock['name']}'입니다. 관련 소식들이 실시간으로 쏟아지는 중입니다.",
+        f"오늘의 핫 토픽! '{top_stock['name']}' 관련 기사가 전체 테마 중 압도적인 빈도를 기록하며 트렌드를 주도하고 있습니다."
+    ]
+    
+    return jsonify({
+        "report": random.choice(templates),
+        "time": datetime.now().strftime('%Y-%m-%d %H:%M')
+    })
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000)
