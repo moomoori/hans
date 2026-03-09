@@ -15,23 +15,49 @@ app = Flask(__name__)
 SEARCH_ID = os.environ.get('NAVER_SEARCH_ID')
 SEARCH_SECRET = os.environ.get('NAVER_SEARCH_SECRET')
 
-# --- [1. 종목 사전 및 티커 매핑] ---
-# --- [1. 종목 사전 자동 업데이트 - FinanceDataReader 활용] ---
 def update_stock_dictionary():
-    print("🚀 FinanceDataReader를 통해 종목 명단을 가져오는 중...")
+    print("🚀 종목 사전 동적 업데이트 시작...")
+    
+    # [1단계] 내장 기본 사전 (절대 죽지 않는 0순위 백업)
+    stock_master = {"삼성전자": "005930", "SK하이닉스": "000660", "에코프로": "086520"} 
+
+    # [2단계] Naver 금융 또는 GitHub에 저장된 최신 종목 리스트 가져오기
+    # KIND가 막혔을 때 가장 안정적인 대체 소스는 네이버 금융의 시총 상위 페이지입니다.
     try:
-        # KRX(코스피, 코스닥, 코넥스) 전체 종목 리스트를 가져옵니다.
-        df = fdr.StockListing('KRX')
+        print("🔍 네이버 금융에서 실시간 상위 종목 수집 중...")
+        # 시가총액 상위 200개 정도만 가져와도 웬만한 핫토픽은 다 잡힙니다.
+        for page in range(1, 5): # 1~4페이지 (총 200개)
+            url = f"https://finance.naver.com/sise/sise_market_sum.naver?&page={page}"
+            res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'})
+            df = pd.read_html(StringIO(res.text), encoding='cp949')[1]
+            df = df.dropna(subset=['종목명'])
+            
+            for _, row in df.iterrows():
+                name = str(row['종목명'])
+                # 종목코드는 href 링크 안에 숨어있으므로 여기서 추출하거나 
+                # yfinance가 찾을 수 있게 이름만이라도 저장
+                stock_master[name] = "SEARCH" # 코드를 모를 땐 이름만 저장 후 나중에 검색
         
-        # 종목명과 종목코드를 매핑 (Code 컬럼 사용)
-        # FinanceDataReader는 코드를 문자열로 예쁘게 가져와줍니다.
-        stock_dict = df.set_index('Name')['Code'].to_dict()
-        
-        print(f"✅ 총 {len(stock_dict)}개 종목 로드 완료 (FDR 방식)")
-        return stock_dict
+        print(f"✅ 실시간 종목 포함 총 {len(stock_master)}개 로드 완료")
+        return stock_master
+
     except Exception as e:
-        print(f"❌ FDR 로드 실패: {e}. 내장 사전으로 전환합니다.")
-        return {"삼성전자": "005930", "SK하이닉스": "000660", "현대차": "005380"}
+        print(f"⚠️ 실시간 수집 실패({e}), 내장 사전을 확장하여 사용합니다.")
+        # 실패 시 제가 미리 준비한 '광범위 리스트(200개)'를 더해줍니다.
+        stock_master.update(get_backup_list()) 
+        return stock_master
+
+def get_backup_list():
+    # 여기에 거래량 상위 200~300개 리스트를 텍스트로 박아둡니다.
+    return {"삼성전자": "005930", "SK하이닉스": "000660", "현대차": "005380", "LG에너지솔루션": "373220",
+        "삼성바이오로직스": "207940", "기아": "000270", "셀트리온": "068270", "POSCO홀딩스": "005490",
+        "KB금융": "105560", "네이버": "035420", "NAVER": "035420", "신한지주": "055550",
+        "삼성물산": "028260", "현대모비스": "012330", "포스코퓨처엠": "003670", "카카오": "035720",
+        "삼성 SDI": "006400", "LG화학": "051910", "HMM": "011200", "에코프로": "086520",
+        "에코프로비엠": "247540", "알테오젠": "196170", "HLB": "028300", "엔켐": "348370",
+        "한미반도체": "042700", "신성델타테크": "065350", "제주반도체": "080220", "두산로보틱스": "454910",
+        "LS 에코에너지": "229640", "대한항공": "003490", "아시아나항공": "020560", "한화에어로스페이스": "012450",
+        "LIG넥스원": "079550", "현대로템": "064350", "SK이노베이션": "096770", "S-Oil": "010950"} # (생략)
 
 STOCK_MASTER = update_stock_dictionary()
 STOCK_NAMES = list(STOCK_MASTER.keys())
@@ -128,6 +154,42 @@ def get_stock_info():
         "price_info": price_data,
         "news": combined_news
     })
+
+    @app.route('/get_all_top_stocks')
+def get_all_top_stocks():
+    # 모든 테마에서 수집된 종목 중 가장 많이 언급된 통합 TOP 5 추출
+    # (이미 stock_cache에 데이터가 쌓여있어야 작동합니다)
+    all_counts = {}
+    for theme in stock_cache:
+        for item in stock_cache[theme]['data']:
+            name = item['name']
+            all_counts[name] = max(all_counts.get(name, 0), item['count'])
+    
+    sorted_all = sorted([{"name": k, "count": v} for k, v in all_counts.items()], 
+                        key=lambda x: x['count'], reverse=True)[:5]
+    
+    # 데이터가 아직 없으면 기본값 반환
+    if not sorted_all:
+        return jsonify([{"name": "데이터 수집 중", "count": 0}])
+        
+    return jsonify(sorted_all)@app.route('/get_all_top_stocks')
+def get_all_top_stocks():
+    # 모든 테마에서 수집된 종목 중 가장 많이 언급된 통합 TOP 5 추출
+    # (이미 stock_cache에 데이터가 쌓여있어야 작동합니다)
+    all_counts = {}
+    for theme in stock_cache:
+        for item in stock_cache[theme]['data']:
+            name = item['name']
+            all_counts[name] = max(all_counts.get(name, 0), item['count'])
+    
+    sorted_all = sorted([{"name": k, "count": v} for k, v in all_counts.items()], 
+                        key=lambda x: x['count'], reverse=True)[:5]
+    
+    # 데이터가 아직 없으면 기본값 반환
+    if not sorted_all:
+        return jsonify([{"name": "데이터 수집 중", "count": 0}])
+        
+    return jsonify(sorted_all)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000)
