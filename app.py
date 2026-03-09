@@ -84,17 +84,40 @@ def index():
 @app.route('/get_top_stocks')
 def get_top_stocks():
     theme = request.args.get('theme', '반도체')
+    # 네이버 API에서 뉴스 100개를 가져옵니다.
     url = f"https://openapi.naver.com/v1/search/news.json?query={theme}&display=100&sort=date"
     headers = {"X-Naver-Client-Id": SEARCH_ID, "X-Naver-Client-Secret": SEARCH_SECRET}
+    
     try:
         res = requests.get(url, headers=headers).json().get('items', [])
-        content = " ".join([i['title'] for i in res])
-        counts = [{"name": n, "count": content.count(n)} for n in STOCK_NAMES if n in content]
-        top5 = sorted(counts, key=lambda x: x['count'], reverse=True)[:5]
+        
+        # 종목별 언급 횟수를 담을 딕셔너리
+        counts_dict = {name: 0 for name in STOCK_NAMES}
+        
+        for item in res:
+            # 제목 + 요약문을 하나로 합쳐서 검색 대상 생성
+            content = (item['title'] + item['description']).replace('<b>', '').replace('</b>', '')
+            
+            for name in STOCK_NAMES:
+                # 뉴스 1개당 종목명이 포함되어 있다면 딱 1회만 카운트 (중복 방지)
+                if name in content:
+                    counts_dict[name] += 1
+        
+        # 0회 언급된 종목은 제외하고 상위 5개 추출
+        top5 = []
+        for name, count in counts_dict.items():
+            if count > 0:
+                top5.append({"name": name, "count": count})
+        
+        top5 = sorted(top5, key=lambda x: x['count'], reverse=True)[:5]
+        
         if top5:
             stock_cache[theme] = {"data": top5, "time": datetime.now().strftime('%H:%M:%S')}
+            
         return jsonify(top5)
-    except: return jsonify([])
+    except Exception as e:
+        print(f"❌ 언급 수 계산 중 오류: {e}")
+        return jsonify([])
 
 @app.route('/get_stock_info')
 def get_stock_info():
