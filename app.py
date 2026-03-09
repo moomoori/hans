@@ -15,37 +15,46 @@ app = Flask(__name__)
 SEARCH_ID = os.environ.get('NAVER_SEARCH_ID')
 SEARCH_SECRET = os.environ.get('NAVER_SEARCH_SECRET')
 
-def update_stock_dictionary():
-    print("🚀 종목 사전 동적 업데이트 시작...")
-    
-    # [1단계] 내장 기본 사전 (절대 죽지 않는 0순위 백업)
-    stock_master = {"삼성전자": "005930", "SK하이닉스": "000660", "에코프로": "086520"} 
+import requests
+import pandas as pd
+from io import StringIO
 
-    # [2단계] Naver 금융 또는 GitHub에 저장된 최신 종목 리스트 가져오기
-    # KIND가 막혔을 때 가장 안정적인 대체 소스는 네이버 금융의 시총 상위 페이지입니다.
+def update_stock_dictionary():
+    print("🚀 네이버 금융에서 실시간 종목 리스트 수집 시작...")
+    stock_dict = {}
+    
+    # 1. 혹시 모를 상황을 대비한 '필수 종목' 미리 넣기
+    stock_dict = {"삼성전자": "005930", "SK하이닉스": "000660", "카카오": "035720"}
+    
     try:
-        print("🔍 네이버 금융에서 실시간 상위 종목 수집 중...")
-        # 시가총액 상위 200개 정도만 가져와도 웬만한 핫토픽은 다 잡힙니다.
-        for page in range(1, 5): # 1~4페이지 (총 200개)
-            url = f"https://finance.naver.com/sise/sise_market_sum.naver?&page={page}"
-            res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'})
-            df = pd.read_html(StringIO(res.text), encoding='cp949')[1]
-            df = df.dropna(subset=['종목명'])
-            
-            for _, row in df.iterrows():
-                name = str(row['종목명'])
-                # 종목코드는 href 링크 안에 숨어있으므로 여기서 추출하거나 
-                # yfinance가 찾을 수 있게 이름만이라도 저장
-                stock_master[name] = "SEARCH" # 코드를 모를 땐 이름만 저장 후 나중에 검색
+        # 시가총액 페이지(1페이지당 50종목)를 40페이지까지 훑습니다. (총 2,000개)
+        # 코스피(sise_market_sum.naver?sosok=0), 코스닥(sosok=1) 둘 다 가져옵니다.
+        for sosok in [0, 1]: 
+            for page in range(1, 21): 
+                url = f"https://finance.naver.com/sise/sise_market_sum.naver?sosok={sosok}&page={page}"
+                res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5)
+                
+                # 네이버 금융은 EUC-KR(cp949)을 사용합니다.
+                df_list = pd.read_html(StringIO(res.text), encoding='cp949')
+                df = df_list[1] # 종목이 들어있는 테이블은 보통 두 번째([1])입니다.
+                
+                # 데이터 정제 (종목명이 없는 행 제거)
+                df = df.dropna(subset=['종목명'])
+                
+                for _, row in df.iterrows():
+                    name = str(row['종목명']).strip()
+                    # 종목코드는 'N' 컬럼 등에 숨어있거나 엑셀 링크에 있는데, 
+                    # 네이버 페이지 구조상 가끔 전처리가 필요할 수 있습니다.
+                    # 여기서는 종목명만 확보하고, 코드는 보조 도구로 채웁니다.
+                    if name:
+                        stock_dict[name] = "SEARCH" # 일단 이름만 확보
         
-        print(f"✅ 실시간 종목 포함 총 {len(stock_master)}개 로드 완료")
-        return stock_master
+        print(f"✅ 총 {len(stock_dict)}개 종목 명단 확보 성공!")
+        return stock_dict
 
     except Exception as e:
-        print(f"⚠️ 실시간 수집 실패({e}), 내장 사전을 확장하여 사용합니다.")
-        # 실패 시 제가 미리 준비한 '광범위 리스트(200개)'를 더해줍니다.
-        stock_master.update(get_backup_list()) 
-        return stock_master
+        print(f"⚠️ 네이버 수집 중 오류({e}), 안전 모드로 전환합니다.")
+        return stock_dict # 에러 나도 지금까지 모은 건 반환
 
 def get_backup_list():
     # 여기에 거래량 상위 200~300개 리스트를 텍스트로 박아둡니다.
