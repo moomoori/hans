@@ -6,64 +6,37 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         :root { --primary: #007bff; --bg: #f4f7f6; --card: #ffffff; }
-        body { font-family: 'Pretendard', -apple-system, sans-serif; margin: 0; padding: 20px; background: var(--bg); color: #333; line-height: 1.6; }
-        
-        /* Layout */
-        .container { display: flex; gap: 20px; max-width: 1000px; margin: 0 auto; align-items: flex-start; }
-        
-        /* Left Monitor */
+        body { font-family: 'Pretendard', sans-serif; margin: 0; padding: 20px; background: var(--bg); color: #333; }
+        .container { display: flex; gap: 20px; max-width: 1000px; margin: 0 auto; }
         .side-monitor { width: 240px; background: var(--card); border-radius: 20px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); position: sticky; top: 20px; flex-shrink: 0; }
-        .side-title { font-weight: 800; font-size: 16px; margin-bottom: 15px; color: #ff4757; display: flex; align-items: center; gap: 8px; }
-        .hot-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px dashed #eee; cursor: pointer; transition: 0.2s; }
-        .hot-item:hover { color: var(--primary); transform: translateX(5px); }
-        .rank { font-weight: 800; color: var(--primary); width: 20px; }
-        .name { font-size: 14px; font-weight: 600; flex: 1; margin-left: 10px; }
-        .cnt { font-size: 11px; color: #999; }
-
-        /* Main Area */
+        .side-title { font-weight: 800; font-size: 15px; margin-bottom: 15px; color: #ff4757; }
+        .hot-item { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px dashed #eee; cursor: pointer; }
         .main-content { flex: 1; min-width: 0; }
-        h2 { font-weight: 800; letter-spacing: -1px; margin-top: 0; }
-
-        /* Tabs & Badges */
-        .tabs { display: flex; gap: 8px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 5px; scrollbar-width: none; }
-        .tab-btn { padding: 10px 18px; border: none; border-radius: 25px; cursor: pointer; background: #fff; font-weight: 600; font-size: 13px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); flex-shrink: 0; }
+        .tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+        .tab-btn { padding: 10px 18px; border: none; border-radius: 25px; cursor: pointer; background: #fff; font-weight: 600; }
         .tab-btn.active { background: var(--primary); color: white; }
-        
-        .stock-badges { display: flex; gap: 10px; margin-bottom: 25px; overflow-x: auto; padding: 5px 0; scrollbar-width: none; }
-        .badge { min-width: 100px; padding: 15px; background: white; border-radius: 15px; cursor: pointer; text-align: center; border: 2px solid transparent; box-shadow: 0 2px 8px rgba(0,0,0,0.05); flex-shrink: 0; transition: 0.2s; }
-        .badge.active { border-color: var(--primary); transform: translateY(-3px); }
-        .b-name { font-weight: 700; font-size: 14px; }
-        .b-cnt { font-size: 11px; color: var(--primary); margin-top: 4px; font-weight: 600; }
-
-        /* News Feed */
-        .news-box { background: white; border-radius: 20px; padding: 25px; box-shadow: 0 4px 20px rgba(0,0,0,0.04); min-height: 500px; display: flex; flex-direction: column; }
-        #news-title-area { margin-bottom: 20px; } /* 추가된 영역 스타일 */
-        .news-item { padding: 18px 0; border-bottom: 1px solid #f1f3f5; }
-        .news-item:last-child { border-bottom: none; }
+        .stock-badges { display: flex; gap: 10px; margin-bottom: 25px; overflow-x: auto; padding-bottom: 10px; }
+        .badge { min-width: 90px; padding: 15px; background: white; border-radius: 15px; cursor: pointer; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05); flex-shrink: 0; }
+        .badge.active { border: 2px solid var(--primary); }
+        .news-box { background: white; border-radius: 20px; padding: 25px; min-height: 500px; }
+        .news-item { padding: 15px 0; border-bottom: 1px solid #f1f3f5; }
         .news-item a { text-decoration: none; color: inherit; }
-        .news-item .title { font-size: 15px; font-weight: 600; margin-bottom: 8px; display: block; line-height: 1.5; }
+        .news-item .title { font-size: 15px; font-weight: 600; display: block; margin-bottom: 5px; }
         .news-item .meta { font-size: 12px; color: #adb5bd; }
-
-        /* Pagination */
-        .pagination { display: flex; justify-content: center; gap: 6px; margin-top: auto; padding-top: 30px; }
-        .page-btn { width: 34px; height: 34px; border: 1px solid #e9ecef; background: white; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px; transition: 0.2s; }
-        .page-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
-
-        @media (max-width: 850px) {
-            .container { flex-direction: column; }
-            .side-monitor { width: 100%; position: static; box-sizing: border-box; }
-        }
+        .pagination { display: flex; justify-content: center; gap: 5px; margin-top: 20px; }
+        .page-btn { padding: 5px 10px; border: 1px solid #eee; background: #fff; cursor: pointer; border-radius: 5px; }
+        .page-btn.active { background: var(--primary); color: #fff; }
+        @media (max-width: 850px) { .container { flex-direction: column; } .side-monitor { width: 100%; position: static; } }
     </style>
 </head>
 <body>
     <div class="container">
         <aside class="side-monitor">
-            <div class="side-title">🔥 실시간 통합 TOP 5</div>
+            <div class="side-title" id="side-title-text">🔥 통합 TOP 5 (연결 중...)</div>
             <div id="side-list"></div>
         </aside>
-
         <main class="main-content">
-            <h2>📈 뉴스 키워드 분석</h2>
+            <h2>📈 키워드 분석 리포트</h2>
             <div class="tabs">
                 <button class="tab-btn active" onclick="changeTheme('반도체', this)">반도체</button>
                 <button class="tab-btn" onclick="changeTheme('2차전지', this)">2차전지</button>
@@ -71,9 +44,8 @@
                 <button class="tab-btn" onclick="changeTheme('바이오', this)">바이오</button>
             </div>
             <div id="badge-list" class="stock-badges"></div>
-            
             <div class="news-box">
-                <div id="news-title-area"></div> 
+                <div id="price-area"></div>
                 <div id="news-list"></div>
                 <div id="pagination" class="pagination"></div>
             </div>
@@ -85,25 +57,21 @@
         const perPage = 10;
 
         function timeAgo(d) {
-            if(!d) return '';
-            try {
-                const diff = Math.floor((new Date() - new Date(d)) / 60000);
-                return diff < 1 ? '방금 전' : diff < 60 ? `${diff}분 전` : diff < 1440 ? `${Math.floor(diff/60)}시간 전` : d.split(' ')[0];
-            } catch(e) { return d; }
+            const diff = Math.floor((new Date() - new Date(d)) / 60000);
+            if (isNaN(diff)) return d;
+            return diff < 1 ? '방금 전' : diff < 60 ? `${diff}분 전` : diff < 1440 ? `${Math.floor(diff/60)}시간 전` : d;
         }
 
         function loadMonitor() {
             fetch('/get_all_top_stocks').then(r => r.json()).then(data => {
-                const sideList = document.getElementById('side-list');
-                if(sideList) {
-                    sideList.innerHTML = data.map((s, i) => `
-                        <div class="hot-item" onclick="loadNews('${s.name}')">
-                            <span class="rank">${i+1}</span>
-                            <span class="name">${s.name}</span>
-                            <span class="cnt">${s.count}회</span>
-                        </div>
-                    `).join('');
-                }
+                document.getElementById('side-title-text').innerHTML = `🔥 통합 TOP 5 <span style="font-size:10px; color:#999; font-weight:normal;">(${data.update_time})</span>`;
+                document.getElementById('side-list').innerHTML = data.stocks.map((s, i) => `
+                    <div class="hot-item" onclick="loadNews('${s.name}')">
+                        <span style="font-weight:800; color:#007bff;">${i+1}</span>
+                        <span style="flex:1; margin-left:10px; font-size:14px;">${s.name}</span>
+                        <span style="font-size:11px; color:#999;">${s.count}회</span>
+                    </div>
+                `).join('');
             });
         }
 
@@ -111,16 +79,13 @@
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             fetch(`/get_top_stocks?theme=${theme}`).then(r => r.json()).then(data => {
-                const badgeList = document.getElementById('badge-list');
-                if(badgeList) {
-                    badgeList.innerHTML = data.map((s, i) => `
-                        <div class="badge ${i===0?'active':''}" onclick="loadNews('${s.name}', this)">
-                            <div class="b-name">${s.name}</div>
-                            <div class="b-cnt">${s.count}회 언급</div>
-                        </div>
-                    `).join('');
-                    if(data.length) loadNews(data[0].name);
-                }
+                document.getElementById('badge-list').innerHTML = data.map((s, i) => `
+                    <div class="badge ${i===0?'active':''}" onclick="loadNews('${s.name}', this)">
+                        <div style="font-weight:700;">${s.name}</div>
+                        <div style="font-size:11px; color:#007bff;">${s.count}회</div>
+                    </div>
+                `).join('');
+                if(data.length) loadNews(data[0].name);
             });
         }
 
@@ -129,67 +94,35 @@
                 document.querySelectorAll('.badge').forEach(b => b.classList.remove('active'));
                 el.classList.add('active');
             }
-            
             fetch(`/get_stock_info?stock=${stock}`).then(r => r.json()).then(data => {
                 const info = data.price_info;
-                const priceHtml = info ? `
+                document.getElementById('price-area').innerHTML = info ? `
                     <div style="background:#f8f9fa; padding:15px; border-radius:12px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; border-left:5px solid ${info.change >= 0 ? '#ff4757' : '#007bff'}">
-                        <div>
-                            <span style="font-size:12px; color:#888;">${stock} 실시간 시세</span><br>
-                            <span style="font-size:20px; font-weight:800;">${info.price}원</span>
-                        </div>
-                        <div style="text-align:right;">
-                            <span style="color:${info.change >= 0 ? '#ff4757' : '#007bff'}; font-weight:700; font-size:16px;">
-                                ${info.change >= 0 ? '▲' : '▼'} ${Math.abs(info.change)}%
-                            </span>
-                        </div>
-                    </div>
-                ` : `<h3 style="margin-bottom:20px;">${stock} 뉴스</h3>`;
-                
-                // news-title 대신 news-title-area 사용
-                const titleArea = document.getElementById('news-title-area');
-                if(titleArea) titleArea.innerHTML = priceHtml;
-                
-                allNews = data.news || [];
+                        <div><span style="font-size:12px; color:#888;">${stock} 시세</span><br><span style="font-size:20px; font-weight:800;">${info.price}원</span></div>
+                        <div style="color:${info.change >= 0 ? '#ff4757' : '#007bff'}; font-weight:700;">${info.change >= 0 ? '▲' : '▼'} ${Math.abs(info.change)}%</div>
+                    </div>` : `<h3>${stock} 뉴스</h3>`;
+                allNews = data.news;
                 renderPage(1);
             });
         }
 
         function renderPage(p) {
-            const newsList = document.getElementById('news-list');
-            if(!newsList) return;
-
             const start = (p-1)*perPage;
-            if(allNews.length === 0) {
-                newsList.innerHTML = '<p style="text-align:center; padding:40px; color:#999;">관련 뉴스를 찾을 수 없습니다.</p>';
-                document.getElementById('pagination').innerHTML = '';
-                return;
-            }
-
-            newsList.innerHTML = allNews.slice(start, start+perPage).map(n => `
+            document.getElementById('news-list').innerHTML = allNews.slice(start, start+perPage).map(n => `
                 <div class="news-item">
                     <a href="${n.link}" target="_blank">
                         <span class="title">${n.title}</span>
-                        <div class="meta">${timeAgo(n.pubDate)} • ${n.source || '자세히 보기'}</div>
+                        <div class="meta">${timeAgo(n.pubDate)} • ${n.source}</div>
                     </a>
-                </div>
-            `).join('');
+                </div>`).join('');
             
             const total = Math.ceil(allNews.length / perPage);
             let pgHtml = '';
-            for(let i=1; i<=total; i++) {
-                pgHtml += `<button class="page-btn ${i===p?'active':''}" onclick="renderPage(${i})">${i}</button>`;
-            }
+            for(let i=1; i<=total; i++) pgHtml += `<button class="page-btn ${i===p?'active':''}" onclick="renderPage(${i})">${i}</button>`;
             document.getElementById('pagination').innerHTML = pgHtml;
-            // 리스트 하단으로 스크롤이 내려가지 않게 상단으로 고정
         }
 
-        window.onload = () => {
-            loadMonitor();
-            const firstTab = document.querySelector('.tab-btn');
-            if(firstTab) changeTheme('반도체', firstTab);
-            setInterval(loadMonitor, 60000);
-        };
+        window.onload = () => { loadMonitor(); changeTheme('반도체', document.querySelector('.tab-btn')); setInterval(loadMonitor, 60000); };
     </script>
 </body>
 </html>
